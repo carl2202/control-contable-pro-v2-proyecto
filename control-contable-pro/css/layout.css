@@ -1,0 +1,104 @@
+/* ==========================================================================
+   Layout general
+   Estructura de la página: reset básico, cuerpo, encabezado, rejilla principal
+   y panel lateral de navegación entre módulos.
+   ======================================================================= */
+
+        /* Reglas base: box-sizing, tipografía por defecto, cuerpo de la página y contenedor central. */
+        *, *::before, *::after { box-sizing: border-box; font-family: var(--font-sans); }
+        body { background-color: var(--bg-base); color: var(--text-body); margin: 0; padding: 24px 28px; min-height: 100vh; font-size: 0.875rem; line-height: 1.5; }
+        .container { max-width: 1560px; margin: 0 auto; width: 100%; }
+
+        /* Encabezado superior (barra verde con marca, insignia del sistema y botones de acción). */
+        header {
+            background: linear-gradient(100deg, #2F4A38 0%, #4F6F52 55%, #42705A 100%);
+            border: 1px solid #2F4A38;
+            border-radius: var(--radius-lg);
+            padding: 18px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 6px 16px -4px rgba(66, 112, 90, 0.30);
+        }
+        .terminal-brand-area { display: flex; flex-direction: column; gap: 5px; }
+        .terminal-sys-badge {
+            display: inline-flex; align-items: center; gap: 7px; font-size: 0.68rem; font-weight: 600;
+            color: #F2F6EE; text-transform: uppercase; background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.18); padding: 3px 10px; border-radius: var(--radius-full); width: fit-content;
+        }
+        .sys-pulse { width: 6px; height: 6px; border-radius: 50%; background: #E3F0FF; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22); display: inline-block; }
+        header h1 {
+            margin: 2px 0 0 0; font-size: 1.25rem; font-weight: 600; color: #FFFFFF;
+            display: flex; align-items: center; gap: 10px; font-family: 'Source Serif 4', Georgia, serif;
+        }
+        .header-brand-icon-box {
+            display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+            background: #F2F6EE; color: #4F6F52; border: 1px solid rgba(255, 255, 255, 0.55); border-radius: var(--radius-md); flex-shrink: 0;
+        }
+        header p { margin: 0; font-size: 0.78rem; color: #D1FAE5; font-weight: 400; }
+        .header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .terminal-telemetry-badge {
+            display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16); padding: 7px 14px; border-radius: var(--radius-full); font-size: 0.75rem;
+        }
+        .telemetry-label { color: #D1FAE5; font-weight: 500; }
+        .telemetry-val { color: #FFFFFF; font-weight: 700; }
+
+        /* CORRECCIÓN DE LA GRILLA PRINCIPAL PARA EVITAR CORTES EN EL PANEL DERECHO */
+        /* Rejilla principal: área de contenido (izquierda) + panel de módulos (derecha, 280px). */
+        .app-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+        .main-content-area { min-width: 0; }
+        .modules-sidebar-right { position: sticky; top: 20px; z-index: 40; }
+        
+        /* Panel lateral derecho de módulos: tarjeta, cabecera y título. */
+        .sidebar-panel-card {
+            background: linear-gradient(180deg, #2F4A38 0%, #4F6F52 100%);
+            border: 1px solid #2F4A38; border-radius: var(--radius-lg); padding: 18px 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow-sm);
+        }
+        .sidebar-header { padding-bottom: 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.18); }
+        .sidebar-brand-badge {
+            display: inline-flex; align-items: center; gap: 6px; font-size: 0.68rem; font-weight: 600;
+            color: #E1EBDC; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.24); padding: 3px 9px; border-radius: var(--radius-full); margin-bottom: 8px;
+        }
+        .sidebar-brand-icon { width: 12px; height: 12px; }
+        .sidebar-title { margin: 0; font-size: 0.95rem; font-weight: 600; color: #FFFFFF; font-family: 'Source Serif 4', Georgia, serif; }
+        .sidebar-subtitle { margin: 2px 0 0 0; font-size: 0.75rem; color: #CBDCC5; font-weight: 400; }
+        /* Lista de botones de módulo (F1..F5) dentro del panel lateral. */
+        .main-modules { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; }
+        
+        /* Botón de módulo: estados normal, hover y activo (módulo visible). */
+        .module-btn {
+            position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px;
+            border-radius: var(--radius-md); font-size: 0.82rem; font-weight: 500; border: 1px solid transparent;
+            cursor: pointer; background: transparent; color: #EDF3E8; text-align: left; transition: var(--transition-smooth); outline: none;
+        }
+        .module-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.22); color: #FFFFFF; transform: translateX(2px); }
+        .module-btn.active { background: #B8CDB2; border-color: #8FB087; color: #26302A; box-shadow: 0 1px 3px rgba(79, 111, 82, 0.25); }
+        .module-key-code { font-size: 0.65rem; font-weight: 600; color: #E1EBDC; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.24); padding: 2px 6px; border-radius: var(--radius-xs); flex-shrink: 0; }
+        .module-btn.active .module-key-code { color: #2F4A38; background: #E1EBDC; border-color: #B8CDB2; }
+        .module-icon-box {
+            width: 34px; height: 34px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.22); color: #E1EBDC;
+        }
+        .module-btn.active .module-icon-box { background: #E1EBDC; border-color: #8FB087; color: #2F4A38; box-shadow: none; }
+        .module-info { display: flex; flex-direction: column; flex-grow: 1; min-width: 0; }
+        .module-name { font-size: 0.82rem; font-weight: 600; color: #FFFFFF; line-height: 1.25; }
+        .module-btn.active .module-name { color: #26302A; font-weight: 700; }
+        .module-desc { font-size: 0.7rem; font-weight: 400; color: #CBDCC5; line-height: 1.25; margin-top: 2px; }
+        .module-btn.active .module-desc { color: #3A463E; }
+        .module-indicator { width: 3px; height: 18px; border-radius: var(--radius-full); background: transparent; transition: var(--transition-smooth); flex-shrink: 0; }
+        .module-btn.active .module-indicator { background: #4F6F52; }
+        
+        /* Pie del panel lateral: indicador de estado del sistema y leyenda de país/IVA. */
+        .sidebar-footer-info { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.18); display: flex; flex-direction: column; gap: 4px; }
+        .system-status-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 0.72rem; font-weight: 600; color: #E1EBDC; }
+        .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #8FB087; box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.30); }
+        .system-meta-text { font-size: 0.7rem; color: #CBDCC5; }
+
+        /* Vistas de módulo: solo la vista con clase .active se muestra (con animación de entrada). */
+        .section-view { display: none; }
+        .section-view.active { display: block; animation: viewFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes viewFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }

@@ -1,0 +1,70 @@
+/* ==========================================================================
+   Notificaciones y diálogos
+   Toasts apilados (#toastStack, creados por showToast) y ventanas modales
+   (openDialog / confirmDialog) que sustituyen a alert() y confirm() del navegador.
+   Todo usa los tokens de variables.css (paleta salvia, terracota y ocre).
+   ======================================================================= */
+
+        /* Contenedor de toasts: esquina superior derecha, por encima de los diálogos para que sus avisos siempre se vean. */
+        #toastStack {
+            position: fixed; top: 24px; right: 24px; z-index: 10000; display: flex; flex-direction: column; gap: 10px;
+            width: min(380px, calc(100vw - 32px)); pointer-events: none;
+        }
+        /* Toast: tarjeta clara con borde de color según el tipo (éxito / error / advertencia / info), icono y barra de tiempo. */
+        .toast-item {
+            --t-color: var(--primary); --t-bg: var(--primary-light);
+            pointer-events: auto; position: relative; overflow: hidden;
+            display: grid; grid-template-columns: 30px minmax(0, 1fr) 22px; gap: 12px; align-items: start;
+            background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--t-color);
+            border-radius: var(--radius-md); padding: 12px 10px 15px 14px; box-shadow: var(--shadow-lg);
+            color: var(--text-main); font-size: 0.82rem; font-weight: 500; line-height: 1.45;
+            animation: toastIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .toast-item.t-error { --t-color: var(--danger); --t-bg: #F8EBE4; }
+        .toast-item.t-warning { --t-color: var(--warning); --t-bg: #FBF3E1; }
+        .toast-item.t-info { --t-color: #42705A; --t-bg: #EDF4EE; }
+        .toast-item .t-ico { width: 30px; height: 30px; border-radius: var(--radius-md); display: grid; place-items: center; background: var(--t-bg); color: var(--t-color); border: 1px solid var(--border); }
+        .toast-item .t-ico svg { width: 16px; height: 16px; }
+        .toast-item .t-msg { padding-top: 5px; word-break: break-word; }
+        .toast-item .t-close {
+            width: 22px; height: 22px; padding: 0; margin-top: 4px; display: grid; place-items: center; background: transparent;
+            border: none; border-radius: var(--radius-xs); color: var(--text-subtle); cursor: pointer; transition: var(--transition-smooth);
+        }
+        .toast-item .t-close:hover { background: var(--surface-hover); color: var(--text-main); }
+        .toast-item .t-close svg { width: 12px; height: 12px; }
+        /* Barra de tiempo: al terminar su animación el toast se cierra; se pausa al pasar el cursor por encima. */
+        .toast-item .t-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--t-color); opacity: 0.35; transform-origin: left; animation: toastBar var(--t-life, 4200ms) linear forwards; }
+        .toast-item:hover .t-bar { animation-play-state: paused; }
+        .toast-item.leaving { animation: toastOut 0.18s ease forwards; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes toastOut { to { opacity: 0; transform: translateX(16px); } }
+        @keyframes toastBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+        /* Fondo oscurecido del modal y bloqueo del scroll de la página mientras hay un diálogo abierto. */
+        body.dlg-open { overflow: hidden; }
+        .dlg-overlay {
+            position: fixed; inset: 0; z-index: 9000; background: rgba(47, 58, 51, 0.45); backdrop-filter: blur(2px);
+            display: flex; align-items: center; justify-content: center; padding: 20px; animation: dlgFade 0.16s ease;
+        }
+        .dlg-overlay.closing { opacity: 0; transition: opacity 0.14s ease; }
+        /* Ventana del diálogo: misma superficie, borde y sombra que las tarjetas (.card-box). */
+        .dlg {
+            --d-color: var(--primary); --d-bg: var(--primary-light);
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+            width: min(440px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden;
+            animation: dlgIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .dlg.dlg-wide { width: min(780px, 100%); }
+        .dlg.tone-danger { --d-color: var(--danger); --d-bg: #F8EBE4; }
+        .dlg.tone-warning { --d-color: var(--warning); --d-bg: #FBF3E1; }
+        .dlg.tone-info { --d-color: #42705A; --d-bg: #EDF4EE; }
+        .dlg-head { display: flex; align-items: center; gap: 12px; padding: 16px 22px 14px; border-bottom: 1px solid #CBDCC5; }
+        .dlg-ico { width: 36px; height: 36px; flex: none; border-radius: var(--radius-md); display: grid; place-items: center; background: var(--d-bg); color: var(--d-color); border: 1px solid var(--border); }
+        .dlg-ico svg { width: 18px; height: 18px; }
+        .dlg-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-main); font-family: 'Source Serif 4', Georgia, serif; line-height: 1.25; }
+        .dlg-body { padding: 18px 22px; overflow-y: auto; font-size: 0.85rem; color: var(--text-body); line-height: 1.55; }
+        .dlg-body .dlg-msg { margin: 0; white-space: pre-line; }
+        .dlg-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 14px 22px 16px; background: var(--surface-alt); border-top: 1px solid var(--border-light); }
+        @keyframes dlgFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes dlgIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @media (prefers-reduced-motion: reduce) { .toast-item, .dlg-overlay, .dlg { animation: none; } }

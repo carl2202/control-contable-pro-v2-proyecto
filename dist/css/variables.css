@@ -1,0 +1,56 @@
+/* ==========================================================================
+   Variables de diseño
+   Contiene únicamente el bloque :root con las variables CSS del tema.
+   Debe cargarse PRIMERO en index.html: las demás hojas dependen de ellas.
+   ======================================================================= */
+
+        /* Variables globales (tokens de diseño): colores, tipografías, radios, sombras y transición. */
+        /* Todo el resto de las hojas usa estas variables con var(--nombre). */
+        :root {
+            /* Indica al navegador que la interfaz es de tema claro (controles nativos claros). */
+            color-scheme: light;
+            /* Fondos: --bg-base (página), --surface (tarjetas), --surface-alt / -hover / -active (estados). */
+            --bg-base: #E9EDE4;
+            --surface: #F7F8F3;
+            --surface-alt: #EEF1E8;
+            --surface-hover: #E6EBDF;
+            --surface-active: #E1EBDC;
+            --surface-card: #F7F8F3;
+            /* Textos: principal, cuerpo, atenuado y sutil. */
+            --text-main: #2F3A33;
+            --text-body: #46524A;
+            --text-muted: #6F7B72;
+            --text-subtle: #9AA59C;
+            /* Bordes: normal, claro, foco (inputs) y hover. */
+            --border: #D7DDCF;
+            --border-light: #E6EBDF;
+            --border-focus: #4F6F52;
+            --border-hover: #C5CDBB;
+            /* Color de marca (verde salvia): primary, su versión oscura, clara, borde y brillo. */
+            --primary: #4F6F52;
+            --primary-dark: #2F4A38;
+            --primary-light: #E1EBDC;
+            --primary-border: #B8CDB2;
+            --primary-glow: rgba(79, 111, 82, 0.15);
+            /* Colores semánticos: éxito, peligro (terracota) y advertencia (ocre). */
+            --success: #4F6F52;
+            --danger: #B2603F;
+            --warning: #B58A3C;
+            /* Familias tipográficas (sans para interfaz, mono para códigos/números). */
+            --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            /* Radios de borde (de xs a full = píldora). */
+            --radius-xs: 4px;
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --radius-full: 9999px;
+            /* Sombras de elevación (de xs a lg). */
+            --shadow-xs: 0 1px 2px 0 rgba(47, 58, 51, 0.04);
+            --shadow-sm: 0 1px 3px 0 rgba(47, 58, 51, 0.05), 0 1px 2px -1px rgba(47, 58, 51, 0.04);
+            --shadow-md: 0 4px 6px -1px rgba(47, 58, 51, 0.05), 0 2px 4px -2px rgba(47, 58, 51, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(47, 58, 51, 0.06), 0 4px 6px -4px rgba(47, 58, 51, 0.03);
+            /* Transición estándar usada en botones y elementos interactivos. */
+            --transition-smooth: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+        }

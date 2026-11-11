@@ -1,0 +1,33 @@
+/* ==========================================================================
+   Adaptación a pantallas (responsive)
+   Reglas finales de rejillas por módulo y media queries. Se carga ÚLTIMA para poder sobrescribir.
+   ======================================================================= */
+
+        /* Rejillas específicas de las métricas de Reportes y de Caja Chica. */
+        #reportMetricsGrid { grid-template-columns: repeat(6, 1fr); }
+        #reportMetricsGrid .metric-card { grid-column: span 2 !important; }
+        #reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
+        #ccMetricsGrid { grid-template-columns: repeat(2, 1fr); }
+
+        /* Media queries: adaptan la rejilla, el padding y las columnas en pantallas menores a 1200, 990, 900, 700 y 560px. */
+        @media (max-width: 1200px) {
+            .app-layout { grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
+            .workspace { grid-template-columns: 380px minmax(0, 1fr); }
+        }
+        @media (max-width: 990px) { body { padding: 16px; } .workspace { grid-template-columns: 1fr !important; } }
+        @media (max-width: 900px) {
+            .app-layout { grid-template-columns: 1fr; }
+            .modules-sidebar-right { position: static; order: -1; }
+            .main-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+            #reportMetricsGrid { grid-template-columns: repeat(2, 1fr); }
+            #reportMetricsGrid .metric-card { grid-column: span 1 !important; }
+            #reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
+        }
+        @media (max-width: 700px) {
+            #ccMetricsGrid { grid-template-columns: 1fr; }
+            /* Calendario: celdas más compactas y sin texto de nota (queda disponible al abrir el día). */
+            .cal-day { min-height: 62px; padding: 6px; }
+            .cal-day .d-note, .cal-day .d-tag { display: none; }
+            .cal-title { min-width: 0; font-size: 1.05rem; }
+        }
+        @media (max-width: 560px) { .op-grid { grid-template-columns: repeat(2, 1fr); } }

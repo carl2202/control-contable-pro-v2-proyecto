@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* Hojas de estilo del sistema original: tokens, tipografía, paletas y componentes */
+@import "../css/variables.css";
+@import "../css/layout.css";
+@import "../css/buttons.css";
+@import "../css/dashboard.css";
+@import "../css/forms.css";
+@import "../css/tables.css";
+@import "../css/widgets.css";
+@import "../css/feedback.css";
+@import "../css/calendar.css";
+@import "../css/cierre.css";
+@import "../css/responsive.css";
+
+/* ============================================================
+   Estilos base del documento
+   El body hereda el fondo claro definido en variables.css
+   (--bg-base: #E9EDE4 → tono off-white/verde muy suave).
+   NO se sobreescribe con ningún color oscuro; toda la paleta
+   proviene exclusivamente de las variables CSS del tema.
+   ============================================================ */
+body {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Fondo suave off-white derivado de variables.css — no oscuro */
+  background-color: var(--bg-base);
+  color: var(--text-body);
+  margin: 0;
+  padding: 0;
+}
+
+/* Evitar truncamiento de texto en botones de tablas de inventario y acciones */
+.btn-table-action {
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+}
+
+/* Asegurar contenedor responsive con scroll suave */
+.table-responsive-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

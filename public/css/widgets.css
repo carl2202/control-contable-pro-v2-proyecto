@@ -1,0 +1,42 @@
+/* ==========================================================================
+   Componentes auxiliares
+   Chips de filtro, panel informativo, barra de stock y estilos del gráfico SVG.
+   ======================================================================= */
+
+        /* Barra de filtros por público y chips de categoría con contador (.cat-chip). */
+        .category-filter-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        .cat-chip {
+            padding: 6px 14px; border-radius: var(--radius-full); font-size: 0.74rem; font-weight: 600; background: var(--surface);
+            color: var(--text-muted); border: 1px solid var(--border); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: var(--transition-smooth);
+        }
+        .cat-chip:hover { background: #F2F6EE; color: #2F4A38; border-color: #B8CDB2; }
+        .cat-chip.active { background: #3A6350; border-color: #3A6350; color: #fff; box-shadow: 0 1px 3px rgba(79, 111, 82, 0.20); }
+        .cat-chip .cnt { font-style: normal; font-family: var(--font-mono); font-size: .68rem; min-width: 20px; text-align: center; padding: 1px 6px; border-radius: 4px; background: #F1F4EA; border: 1px solid #D7DDCF; color: #57534E; }
+        .cat-chip.active .cnt { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.3); color: #fff; }
+
+        /* Panel informativo (usado en Caja Chica). */
+        .info-panel {
+            background: var(--primary-light); border: 1px solid var(--primary-border); border-left: 4px solid var(--primary);
+            border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 18px; font-size: 0.82rem; color: var(--primary-dark); line-height: 1.5;
+        }
+        .info-panel b { color: #2F4A38; font-weight: 600; }
+        /* Variante de advertencia del panel informativo (ocre). */
+        .info-panel.is-warning { background: #FBF3E1; border-color: #EBD6A4; border-left-color: var(--warning); color: #7A5A1F; }
+        .info-panel.is-warning b { color: #5F4519; }
+        /* Celda numérica en tipografía monoespaciada (códigos, montos, cantidades). */
+        .cell-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+        /* Barra de nivel de stock (.stk): normal, bajo (.l) y agotado (.z). */
+        .stk { display: inline-block; width: 46px; height: 4px; background: #D7DDCF; border-radius: 2px; vertical-align: middle; margin-left: 6px; overflow: hidden; }
+        .stk i { display: block; height: 100%; background: #3A6350; }
+        .stk.l i { background: #9A7330; } .stk.z i { background: #B2603F; }
+
+        /* Gráfico de balance de 7 días (SVG generado por renderChart) y su estado vacío. */
+        .chart-legend { font-size: 0.72rem; font-weight: 500; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; }
+        .chart-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-left: 10px; }
+        .chart-wrap { width: 100%; min-height: 210px; }
+        .chart-wrap svg { width: 100%; height: auto; display: block; font-variant-numeric: tabular-nums lining-nums; }
+        .chart-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; height: 210px; color: var(--text-subtle); font-size: 0.8rem; }
+        .chart-empty svg { width: 56px; height: 56px; color: #9AA59C; }
+        .chart-empty b { font-size: .9rem; color: var(--text-body); font-weight: 600; }
+        .chart-empty span { max-width: 320px; text-align: center; line-height: 1.45; }

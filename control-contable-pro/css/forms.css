@@ -1,0 +1,65 @@
+/* ==========================================================================
+   Formularios y fichas de selección
+   Área de trabajo, tarjetas, campos de formulario, fichas (.op-tile) y filas de variantes.
+   ======================================================================= */
+
+        /* Área de trabajo en dos columnas (formulario | tabla) y tarjetas contenedoras (.card-box). */
+        .workspace { display: grid; grid-template-columns: 440px minmax(0, 1fr); gap: 20px; align-items: start; }
+        .card-box { background: var(--surface); padding: 22px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border); overflow: hidden; }
+        .card-box h3 {
+            margin-top: 0; font-size: 0.76rem; font-weight: 700; color: #2F4A38; border-bottom: 1px solid #CBDCC5;
+            padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: .07em;
+        }
+        .card-box h3 .h3-ico { vertical-align: -3px; margin-right: 8px; color: var(--primary); }
+
+        /* Grupos de formulario: etiquetas, inputs y selects, estado de foco y solo lectura. */
+        .form-group { margin-bottom: 14px; position: relative; }
+        .form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-body); margin-bottom: 6px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
+            font-size: 0.85rem; background: var(--surface); color: var(--text-main); outline: none; transition: var(--transition-smooth);
+        }
+        .form-group input:focus, .form-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+        .form-group input[readonly] { background: var(--surface-alt); color: var(--primary-dark); font-weight: 700; font-size: 1.25rem; }
+
+        /* Selects nativos ocultos (.op-native): se controlan visualmente mediante las fichas .op-tile. */
+        .op-native { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; height: 1px; width: 1px; overflow: hidden; }
+        /* Rejilla y fichas de selección (.op-tile) para tipo de operación, categorías, etc. */
+        .op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .op-tile {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--surface); cursor: pointer; text-align: left; font: inherit; color: var(--text-body); transition: var(--transition-smooth);
+        }
+        .op-tile:hover { border-color: #B8CDB2; background: #F2F5EC; }
+        .op-tile .oi { width: 36px; height: 36px; border-radius: 8px; background: var(--surface-alt); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-muted); flex: none; }
+        .op-tile b { display: block; font-size: .8rem; font-weight: 600; color: var(--text-main); line-height: 1.2; }
+        .op-tile small { font-size: .68rem; color: var(--text-muted); }
+        .op-tile.active { border-color: #4F6F52; background: #F2F6EE; box-shadow: inset 3px 0 0 #4F6F52; }
+        .op-tile.active .oi { background: #4F6F52; border-color: #4F6F52; color: #fff; }
+
+        /* Variante en forma de 'píldora' (.pill-grid) para filtros compactos. */
+        .pill-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+        .pill-grid .op-tile { padding: 6px 10px; gap: 6px; }
+        .pill-grid .op-tile .oi { width: 20px; height: 20px; border: none; background: transparent; }
+        .pill-grid .op-tile b { font-size: .74rem; font-weight: 500; }
+        .pill-grid .op-tile.active { background: #E1EBDC; border-color: #4F6F52; box-shadow: none; }
+        .pill-grid .op-tile.active .oi { background: transparent; color: #2F4A38; }
+
+        /* Variante de 2 columnas (.cat-grid) para categorías. */
+        .cat-grid { grid-template-columns: repeat(2, 1fr); }
+        .cat-grid .op-tile b { font-size: .76rem; }
+
+        /* Caja de pagos / información resaltada dentro de formularios. */
+        .terminal-payments-box { background: #F2F6EE; border: 1px solid #CBDCC5; border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px; }
+        /* Contenedor con scroll de las filas de variantes (talla, color, precio, stock) del inventario. */
+        #variantsContainer { max-height: 250px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; }
+        
+        /* Cuadrícula de inputs de cada variante: fila 1 = talla y color; fila 2 = costo, precio y stock; el botón ✕ ocupa ambas filas. */
+        .variant-input-grid {
+            display: grid; grid-template-columns: repeat(6, 1fr) 34px; gap: 6px; align-items: center;
+            background: #F1F4EA; border: 1px solid #D7DDCF; border-left: 3px solid #3A6350; padding: 8px; border-radius: 8px; margin-bottom: 6px;
+        }
+        .variant-input-grid input { padding: 8px 6px; font-size: 0.82rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none; }
+        .variant-input-grid .var-size, .variant-input-grid .var-color { grid-column: span 3; }
+        .variant-input-grid .var-cost, .variant-input-grid .var-price, .variant-input-grid .var-stock { grid-column: span 2; }
+        .variant-input-grid > button { grid-column: 7; grid-row: 1 / span 2; align-self: stretch; }

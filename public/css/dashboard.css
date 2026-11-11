@@ -1,0 +1,54 @@
+/* ==========================================================================
+   Panel de métricas y pestañas
+   Barra de fecha, pestañas por día y tarjetas de métricas (.metric-card).
+   ======================================================================= */
+
+        /* Barra de control de fecha activa y buscador del historial (módulo Contable). */
+        .date-control-bar {
+            background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #4F6F52;
+            border-radius: var(--radius-lg); padding: 12px 18px; display: flex; justify-content: space-between;
+            align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; box-shadow: var(--shadow-sm);
+        }
+        .date-control-bar label { color: var(--text-body) !important; font-size: 0.8rem; font-weight: 600; }
+        .date-control-bar input[type="date"], .date-control-bar input[type="text"] {
+            background: var(--surface); color: var(--text-main); border: 1px solid var(--border);
+            border-radius: var(--radius-md); padding: 7px 12px; font-size: 0.82rem; outline: none; transition: var(--transition-smooth);
+        }
+        .date-control-bar input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+
+        /* Pestañas de fechas (Todo acumulado / Hoy / fechas anteriores). */
+        .tabs-container { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+        .tab {
+            padding: 8px 16px; background: var(--surface); border: 1px solid var(--border); border-bottom: none;
+            border-radius: var(--radius-md) var(--radius-md) 0 0; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: var(--transition-smooth);
+        }
+        .tab:hover { background: #F2F6EE; color: #2F4A38; border-color: #B8CDB2; }
+        .tab.active { background: var(--surface); color: #42705A; font-weight: 700; border-color: var(--border); border-top: 2px solid #42705A; box-shadow: 0 -2px 4px rgba(66, 112, 90, 0.10); }
+
+        /* Rejilla de tarjetas de métricas (ventas, gastos, IVA, ganancia) y sus tonos de color. */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .metric-card {
+            background: var(--surface); padding: 18px 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border) !important; transition: var(--transition-smooth); position: relative; overflow: hidden;
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-content: start;
+        }
+        .metric-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-hover) !important; }
+        .metric-card > .label { grid-column: 1; grid-row: 1; align-self: center; min-height: 40px; display: flex; align-items: center; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+        .metric-card > .m-icon { grid-column: 2; grid-row: 1; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--surface-alt); border: 1px solid var(--border); color: var(--text-muted); }
+        .metric-card .m-icon svg { width: 20px; height: 20px; }
+        .metric-card > :not(.label):not(.m-icon) { grid-column: 1 / -1; }
+        .metric-card .value { font-size: 1.85rem; font-weight: 600; letter-spacing: -0.01em; font-family: 'Source Serif 4', Georgia, serif; font-variant-numeric: tabular-nums; line-height: 1.15; }
+        .metric-card small { font-size: 0.72rem; font-weight: 500; margin-top: 6px; }
+        
+        .metric-card[data-tone="success"] .m-icon { color: #4F6F52; background: #F2F6EE; border-color: #CBDCC5; }
+        .metric-card[data-tone="danger"] .m-icon { color: #B2603F; background: #F8EBE4; border-color: #EBCDBE; }
+        .metric-card[data-tone="warning"] .m-icon { color: #9A7330; background: #FBF3E1; border-color: #EBD6A4; }
+        .metric-card[data-tone="primary"] .m-icon { color: #42705A; background: #EDF4EE; border-color: #BFD6C6; }
+        
+        /* Tarjeta de ganancia: fondo verde oscuro con texto claro. */
+        .metric-card.metric-card-profit {
+            background: linear-gradient(135deg, #4F6F52 0%, #42705A 100%);
+            border: 1px solid #2F4A38 !important; border-top-color: #2F4A38 !important;
+        }
+        .metric-card.metric-card-profit .label { color: #E1EBDC; }
+        .metric-card.metric-card-profit .value { color: #FFFFFF !important; }

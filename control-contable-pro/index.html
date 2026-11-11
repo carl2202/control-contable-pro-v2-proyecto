@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<!-- ================================================================== -->
+<!-- Control Contable Pro · Tienda de Ropa                               -->
+<!-- Página única con 5 módulos: Contable, Inventario, Apartados,        -->
+<!-- Caja Chica y Reportes. Los datos se guardan en localStorage.        -->
+<!-- Estructura:  css/  (estilos)   js/  (lógica, un archivo por módulo) -->
+<!-- ================================================================== -->
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Contable Pro • Tienda de Ropa</title>
+    <!-- Tipografías de Google Fonts (IBM Plex Sans / Mono y Source Serif 4) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+
+    <!-- Hojas de estilo. El ORDEN importa (cascada): variables primero, responsive al final. -->
+    <link rel="stylesheet" href="css/variables.css">   <!-- Tokens de diseño (:root) -->
+    <link rel="stylesheet" href="css/layout.css">      <!-- Base, encabezado, rejilla y panel lateral -->
+    <link rel="stylesheet" href="css/buttons.css">     <!-- Botones -->
+    <link rel="stylesheet" href="css/dashboard.css">   <!-- Barra de fecha, pestañas y métricas -->
+    <link rel="stylesheet" href="css/forms.css">       <!-- Formularios y fichas de selección -->
+    <link rel="stylesheet" href="css/tables.css">      <!-- Tablas, insignias y toast -->
+    <link rel="stylesheet" href="css/widgets.css">     <!-- Chips, panel informativo, stock y gráfico -->
+    <link rel="stylesheet" href="css/feedback.css">    <!-- Toasts y diálogos modales -->
+    <link rel="stylesheet" href="css/calendar.css">    <!-- Calendario de operaciones -->
+    <link rel="stylesheet" href="css/cierre.css">      <!-- Cierre de inventario -->
+    <link rel="stylesheet" href="css/responsive.css">  <!-- Media queries -->
+</head>
+<body>
+
+<!-- Pila de notificaciones flotantes: showToast() agrega aquí cada aviso (js/dialogs.js). Los diálogos modales se crean dinámicamente. -->
+<div id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Contenedor central de toda la aplicación. -->
+<div class="container">
+    <!-- ENCABEZADO: marca del sistema, indicadores y botón de exportación de respaldo. -->
+    <header>
+        <div class="terminal-brand-area">
+            <div class="terminal-sys-badge">
+                <span class="sys-pulse"></span>
+                <span>SISTEMA ACTIVO • CONTROL CONTABLE</span>
+            </div>
+            <h1>
+                <div class="header-brand-icon-box" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                </div>
+                Control Contable Pro • Tienda de Ropa
+            </h1>
+            <p>El Salvador • Régimen Fiscal IVA 13% • Control de Caja e Inventario Inteligente</p>
+        </div>
+        <div class="header-actions">
+            <div class="terminal-telemetry-badge">
+                <span class="telemetry-label">MODO CAJERO:</span>
+                <span class="telemetry-val">ALTA VELOCIDAD</span>
+            </div>
+            <button class="btn btn-success" onclick="exportDataCSV()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Exportar Excel</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- REJILLA PRINCIPAL: columna izquierda con los módulos (<main>) y columna derecha con el panel de navegación (<aside>). -->
+    <div class="app-layout">
+        <!-- ÁREA DE CONTENIDO: contiene las 5 vistas; solo una tiene la clase .active a la vez (ver switchModule en js/ui.js). -->
+        <main class="main-content-area">
+            <!-- MÓDULO F1 · CONTABLE: registro de ventas, compras, caja chica y servicios con IVA, historial por fecha, métricas y gráfico. -->
+            <!-- VENTA / CAJA -->
+            <div id="viewContable" class="section-view active">
+                <!-- Barra de fecha activa: selector para crear/cambiar el día, buscador del historial y botones de respaldo/borrado. -->
+                <div class="date-control-bar">
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <label>📅 Fecha Activa:</label>
+                        <input type="date" id="newDatePicker">
+                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="addNewDateFromPicker()">+ Cambiar / Crear Fecha</button>
+                    </div>
+                    <!-- Jornada de la fecha activa (laborado / sin ventas / asueto + nota); la llena renderDayStatusBadge() en js/calendar.js. -->
+                    <div class="day-status" id="dayStatusBadge"></div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="searchHistoryInput" placeholder="🔍 Buscar en historial..." oninput="renderMain()" style="width: 220px;">
+                    </div>
+                </div>
+
+                <!-- Pestañas de fechas (se llenan desde renderTabs()). -->
+                <div class="tabs-container" id="tabsBar"></div>
+
+                <!-- Tarjetas de métricas del día: ventas, gastos, IVA neto y ganancia (valores desde renderMain()). -->
+                <div class="metrics-grid">
+                    <div class="metric-card" style="border-top: 2px solid var(--success);">
+                        <div class="label">Ventas Totales</div>
+                        <div class="value" id="lblSales" style="color: var(--success);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--danger);">
+                        <div class="label">Gastos Totales</div>
+                        <div class="value" id="lblExpenses" style="color: var(--danger);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--warning);">
+                        <div class="label">IVA Neto (13%)</div>
+                        <div class="value" id="lblTax" style="color: var(--warning);">$0.00</div>
+                    </div>
+                    <div class="metric-card metric-card-profit" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Ganancia Neta</div>
+                        <div class="value" id="lblProfit" style="color: var(--primary);">$0.00</div>
+                    </div>
+                </div>
+
+                <!-- Área de trabajo: formulario de registro (izquierda) + gráfico e historial (derecha). -->
+                <div class="workspace">
+                    <div class="card-box">
+                        <h3 id="formTitle">Nuevo Registro de Venta / Gasto</h3>
+                        <!-- Formulario de movimientos: su envío está gestionado en js/contable.js. -->
+                        <form id="recordForm">
+                            <div class="form-group">
+                                <label>Tipo de Operación</label>
+                                <select id="type" class="op-native" required onchange="handleTypeChange(this.value)">
+                                    <option value="venta">🟢 Venta de Ropa (Ficha de Tallas)</option>
+                                    <option value="compra">🛍️ Compra de Mercadería</option>
+                                    <option value="cajachica">💵 Pago / Gasto desde Caja Chica</option>
+                                    <option value="luz">💡 Pago de Luz / Energía</option>
+                                    <option value="agua">🚰 Pago de Agua / Serv. Básicos</option>
+                                    <option value="internet">📶 Pago de Internet / Teléfono</option>
+                                </select>
+                                <div class="op-grid">
+                                    <button type="button" class="op-tile active" data-op="venta" onclick="setOp('venta')"><span class="oi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span><b>Venta</b><small>Ficha de tallas</small></span></button>
+                                    <button type="button" class="op-tile" data-op="compra" onclick="setOp('compra')"><span class="oi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span><b>Compra</b><small>Mercadería</small></span></button>
+                                    <button type="button" class="op-tile" data-op="cajachica" onclick="setOp('cajachica')"><span class="oi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><span><b>Caja chica</b><small>Gasto menor</small></span></button>
+                                    <button type="button" class="op-tile" data-op="luz" onclick="setOp('luz')"><span class="oi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></span><span><b>Energía</b><small>Pago de luz</small></span></button>
+                                    <button type="button" class="op-tile" data-op="agua" onclick="setOp('agua')"><span class="oi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg></span><span><b>Agua</b><small>Serv. básicos</small></span></button>
+                                    <button type="button" class="op-tile" data-op="internet" onclick="setOp('internet')"><span class="oi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><path d="M12 19.5h.01"/></svg></span><span><b>Internet</b><small>Teléfono</small></span></button>
+                                </div>
+                            </div>
+
+                            <!-- Grupo visible solo si el tipo es 'Pago desde Caja Chica': concepto autorizado del gasto. -->
+                            <div class="form-group" id="groupCajaChicaSale" style="display:none;">
+                                <label>Concepto Autorizado de Caja Chica</label>
+                                <select id="saleCcCategory" class="op-native">
+                                    <option value="Alimentación y Refrigerios">🍔 Alimentación y Refrigerios</option>
+                                    <option value="Papelería y Útiles de Oficina">📁 Papelería y Útiles de Oficina</option>
+                                    <option value="Artículos de Limpieza y Aseo">🧹 Artículos de Limpieza y Aseo</option>
+                                    <option value="Mensajería y Envíos Locales">🛵 Mensajería y Envíos Locales</option>
+                                    <option value="Reparaciones Menores / Ferretería">🔨 Reparaciones Menores / Ferretería</option>
+                                    <option value="Insumos de Emergencia Operativa">💡 Insumos de Emergencia Operativa</option>
+                                </select>
+                                <div class="op-grid cat-grid" data-for="saleCcCategory">
+                                    <button type="button" class="op-tile" data-val="Alimentación y Refrigerios" onclick="setCat('saleCcCategory',this)"><span class="oi">🍔</span><span><b>Alimentación y Refrigerios</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Papelería y Útiles de Oficina" onclick="setCat('saleCcCategory',this)"><span class="oi">📁</span><span><b>Papelería y Útiles de Oficina</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Artículos de Limpieza y Aseo" onclick="setCat('saleCcCategory',this)"><span class="oi">🧹</span><span><b>Artículos de Limpieza y Aseo</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Mensajería y Envíos Locales" onclick="setCat('saleCcCategory',this)"><span class="oi">🛵</span><span><b>Mensajería y Envíos Locales</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Reparaciones Menores / Ferretería" onclick="setCat('saleCcCategory',this)"><span class="oi">🔨</span><span><b>Reparaciones Menores / Ferretería</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Insumos de Emergencia Operativa" onclick="setCat('saleCcCategory',this)"><span class="oi">💡</span><span><b>Insumos de Emergencia Operativa</b></span></button>
+                                </div>
+                            </div>
+
+                            <!-- Grupo visible solo en ventas: filtros por público/tipo de prenda y selección del modelo. -->
+                            <div class="form-group" id="groupModelSale">
+                                <label>Filtrar por Sección / Tipo de Prenda</label>
+                                <div style="display:block;margin-bottom:8px;">
+                                    <select id="filterSaleAudience" class="op-native" onchange="filterModels()">
+                                        <option value="">Todos</option>
+                                        <option value="Hombre">Hombre</option>
+                                        <option value="Mujer">Mujer</option>
+                                        <option value="Niño">Niño</option>
+                                        <option value="Niña">Niña</option>
+                                        <option value="Unisex">Unisex</option>
+                                    </select>
+                                    <div class="op-grid cat-grid pill-grid" data-for="filterSaleAudience">
+                                        <button type="button" class="op-tile op-pill active" data-val="" onclick="setCat('filterSaleAudience',this)"><span><b>Todos</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Hombre" onclick="setCat('filterSaleAudience',this)"><span><b>Hombre</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Mujer" onclick="setCat('filterSaleAudience',this)"><span><b>Mujer</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Niño" onclick="setCat('filterSaleAudience',this)"><span><b>Niño</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Niña" onclick="setCat('filterSaleAudience',this)"><span><b>Niña</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Unisex" onclick="setCat('filterSaleAudience',this)"><span><b>Unisex</b></span></button>
+                                    </div>
+                                    <select id="filterSaleCategory" class="op-native" onchange="filterModels()">
+                                        <option value="">Todos los tipos</option>
+                                        <option value="Camisa">Camisa</option>
+                                        <option value="Pantalón">Pantalón</option>
+                                        <option value="Vestido">Vestido</option>
+                                        <option value="Short">Short</option>
+                                        <option value="Chumpa">Chumpa</option>
+                                        <option value="Falda">Falda</option>
+                                        <option value="Ropa interior">Ropa interior</option>
+                                        <option value="Accesorios">Accesorios</option>
+                                    </select>
+                                    <div class="op-grid cat-grid pill-grid" data-for="filterSaleCategory">
+                                        <button type="button" class="op-tile op-pill active" data-val="" onclick="setCat('filterSaleCategory',this)"><span><b>Todos los tipos</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Camisa" onclick="setCat('filterSaleCategory',this)"><span><b>Camisa</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Pantalón" onclick="setCat('filterSaleCategory',this)"><span><b>Pantalón</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Vestido" onclick="setCat('filterSaleCategory',this)"><span><b>Vestido</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Short" onclick="setCat('filterSaleCategory',this)"><span><b>Short</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Chumpa" onclick="setCat('filterSaleCategory',this)"><span><b>Chumpa</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Falda" onclick="setCat('filterSaleCategory',this)"><span><b>Falda</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Ropa interior" onclick="setCat('filterSaleCategory',this)"><span><b>Ropa interior</b></span></button>
+                                        <button type="button" class="op-tile op-pill" data-val="Accesorios" onclick="setCat('filterSaleCategory',this)"><span><b>Accesorios</b></span></button>
+                                    </div>
+                                </div>
+
+                                <label>Seleccionar Modelo</label>
+                                <select id="modelCodeSelect" onchange="renderSaleVariantPicker(this.value)">
+                                    <option value="">-- Elige un modelo --</option>
+                                </select>
+                            </div>
+
+                            <!-- Selector de tallas/colores del modelo elegido (se llena con renderSaleVariantPicker()). -->
+                            <div id="saleVariantPickerContainer" style="margin-bottom:12px; display:none;">
+                                <label style="font-size:0.72rem; font-weight:800; color:var(--text-muted); margin-bottom:5px; display:block; font-family:var(--font-mono); text-transform:uppercase;">
+                                    Selecciona las unidades (Con precio unitario):
+                                </label>
+                                <div id="saleVariantsList" style="max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+
+                            <!-- Campos para compras y servicios: descripción, monto y tipo de comprobante. -->
+                            <div id="groupNormalInputs" style="display:none;">
+                                <div class="form-group">
+                                    <label>Descripción del Gasto / Operación</label>
+                                    <input type="text" id="desc" placeholder="Ej. Pago recibo de luz mes de octubre">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Monto Total ($ USD)</label>
+                                <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" required readonly>
+                            </div>
+
+                            <div class="form-group" id="groupDoc">
+                                <label>Comprobante Fiscal</label>
+                                <select id="doc">
+                                    <option value="Factura">Factura Consumidor Final</option>
+                                    <option value="CCF">Crédito Fiscal (CCF)</option>
+                                    <option value="Ticket">Ticket</option>
+                                    <option value="Sin Comprobante">Sin Comprobante / Sin Ticket</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:10px;">Guardar Operación</button>
+                        </form>
+                    </div>
+
+                    <!-- Tarjeta del gráfico de balance de los últimos 7 días (SVG creado por renderChart()). -->
+                    <div class="card-box">
+                        <h3><span><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Balance diario · ventas, gastos y neto</span><span class="chart-legend"><i style="background:#4F6F52"></i>Ventas<i style="background:#B2603F"></i>Gastos</span></h3>
+                        <div id="chartVG" class="chart-wrap"></div>
+                    </div>
+                    
+                    <!-- Tarjeta del historial de movimientos (tabla llenada por renderMain()). -->
+                    <div class="card-box">
+                        <h3 id="tableTitle">
+                            <span>Historial</span>
+                            <button class="btn btn-danger" id="delTabBtn" style="padding: 3px 8px; font-size: 0.72rem;" onclick="deleteCurrentTab()">Eliminar Fecha</button>
+                        </h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 16%;">Hora</th>
+                                        <th style="width: 18%;">Tipo</th>
+                                        <th style="width: 36%;">Detalle con Precios y Tallas</th>
+                                        <th style="width: 15%;">Total</th>
+                                        <th style="width: 15%;">IVA (13%)</th>
+                                        <th style="width: 5%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INVENTARIO Y EDICIÓN -->
+            <!-- MÓDULO F2 · INVENTARIO: formulario de modelos con variantes y catálogo con alertas de bajo stock. -->
+            <div id="viewInventario" class="section-view">
+                <div class="workspace">
+                    <div class="card-box">
+                        <h3 id="invFormTitle"><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>Registrar o Editar en Inventario</h3>
+                        <!-- Formulario de alta/edición de modelos (envío en js/inventory.js). -->
+                        <form id="inventoryForm">
+                            <div class="form-group">
+                                <label>Código del Modelo (Ej. CAM-01)</label>
+                                <input type="text" id="invCode" placeholder="Ej. CAM-01" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombre del Modelo</label>
+                                <input type="text" id="invName" placeholder="Ej. Camisa Polo" required>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+                                <div class="form-group">
+                                    <label>Sección / Público</label>
+                                    <select id="invAudience" required>
+                                        <option value="Hombre">Hombre</option>
+                                        <option value="Mujer">Mujer</option>
+                                        <option value="Niño">Niño</option>
+                                        <option value="Niña">Niña</option>
+                                        <option value="Unisex">Unisex</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tipo de Prenda</label>
+                                    <select id="invCategory" class="op-native" required>
+                                        <option value="Camisa">Camisa</option>
+                                        <option value="Pantalón">Pantalón</option>
+                                        <option value="Vestido">Vestido</option>
+                                        <option value="Short">Short</option>
+                                        <option value="Chumpa">Chumpa</option>
+                                        <option value="Falda">Falda</option>
+                                        <option value="Ropa interior">Ropa interior</option>
+                                        <option value="Accesorios">Accesorios</option>
+                                    </select>
+                                    <div class="op-grid cat-grid" data-for="invCategory">
+                                        <button type="button" class="op-tile active" data-val="Camisa" onclick="setCat('invCategory',this)"><span><b>Camisa</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Pantalón" onclick="setCat('invCategory',this)"><span><b>Pantalón</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Vestido" onclick="setCat('invCategory',this)"><span><b>Vestido</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Short" onclick="setCat('invCategory',this)"><span><b>Short</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Chumpa" onclick="setCat('invCategory',this)"><span><b>Chumpa</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Falda" onclick="setCat('invCategory',this)"><span><b>Falda</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Ropa interior" onclick="setCat('invCategory',this)"><span><b>Ropa interior</b></span></button>
+                                        <button type="button" class="op-tile" data-val="Accesorios" onclick="setCat('invCategory',this)"><span><b>Accesorios</b></span></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr style="border:0; border-top:1px solid var(--border); margin: 12px 0;">
+                            <label style="font-weight:800; font-size:0.75rem; margin-bottom:6px; display:block; font-family:var(--font-mono); text-transform:uppercase; color:var(--text-muted);">
+                                Tallas, Colores, Costos, Precios y Stock:
+                            </label>
+                            
+                            <span class="field-hint" style="margin: -2px 0 8px;">Cada fila: talla y color arriba; abajo, <b>costo</b>, <b>precio de venta</b> y <b>stock</b>. El costo es la base del valor del inventario en el cierre.</span>
+                            <!-- Contenedor de filas de variantes (talla, color, costo, precio, stock); se agregan con addVariantRow(). -->
+                            <div id="variantsContainer"></div>
+                            
+                            <button type="button" class="btn btn-light" style="margin-bottom: 12px; width:100%; justify-content:center; font-size:0.8rem;" onclick="addVariantRow()">+ Añadir Otra Talla/Color</button>
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:10px;">Guardar / Actualizar Inventario</button>
+                        </form>
+                    </div>
+
+                    <!-- Catálogo en bodega: chips de público, filtro por tipo de prenda y tabla de modelos. -->
+                    <div class="card-box">
+                        <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h6"/></svg>Catálogo en Bodega (Con Alertas de Bajo Stock)</h3>
+                        
+                        <div class="category-filter-bar">
+                            <div class="cat-chip active" id="chip-ALL" onclick="filterInvTabs('ALL')"><span>Todos</span><em class="cnt" data-aud="ALL">0</em></div>
+                            <div class="cat-chip" id="chip-Hombre" onclick="filterInvTabs('Hombre')"><span>Hombre</span><em class="cnt" data-aud="Hombre">0</em></div>
+                            <div class="cat-chip" id="chip-Mujer" onclick="filterInvTabs('Mujer')"><span>Mujer</span><em class="cnt" data-aud="Mujer">0</em></div>
+                            <div class="cat-chip" id="chip-Niño" onclick="filterInvTabs('Niño')"><span>Niño</span><em class="cnt" data-aud="Niño">0</em></div>
+                            <div class="cat-chip" id="chip-Niña" onclick="filterInvTabs('Niña')"><span>Niña</span><em class="cnt" data-aud="Niña">0</em></div>
+                            <div class="cat-chip" id="chip-Unisex" onclick="filterInvTabs('Unisex')"><span>Unisex</span><em class="cnt" data-aud="Unisex">0</em></div>
+                        </div>
+
+                        <div style="margin-bottom: 10px;">
+                            <select id="invCatTypeFilter" class="op-native" onchange="renderInventoryTable()">
+                                <option value="">Todos los tipos de prenda</option>
+                                <option value="Camisa">Camisas</option>
+                                <option value="Pantalón">Pantalones</option>
+                                <option value="Vestido">Vestidos</option>
+                                <option value="Short">Shorts</option>
+                                <option value="Chumpa">Chumpas</option>
+                                <option value="Falda">Faldas</option>
+                                <option value="Ropa interior">Ropa interior</option>
+                                <option value="Accesorios">Accesorios</option>
+                            </select>
+                            <div class="op-grid cat-grid pill-grid" data-for="invCatTypeFilter">
+                                <button type="button" class="op-tile op-pill active" data-val="" onclick="setCat('invCatTypeFilter',this)"><span><b>Todos los tipos de prenda</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Camisa" onclick="setCat('invCatTypeFilter',this)"><span><b>Camisas</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Pantalón" onclick="setCat('invCatTypeFilter',this)"><span><b>Pantalones</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Vestido" onclick="setCat('invCatTypeFilter',this)"><span><b>Vestidos</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Short" onclick="setCat('invCatTypeFilter',this)"><span><b>Shorts</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Chumpa" onclick="setCat('invCatTypeFilter',this)"><span><b>Chumpas</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Falda" onclick="setCat('invCatTypeFilter',this)"><span><b>Faldas</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Ropa interior" onclick="setCat('invCatTypeFilter',this)"><span><b>Ropa interior</b></span></button>
+                                <button type="button" class="op-tile op-pill" data-val="Accesorios" onclick="setCat('invCatTypeFilter',this)"><span><b>Accesorios</b></span></button>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 18%;">Código</th>
+                                        <th style="width: 32%;">Modelo y Categoría</th>
+                                        <th style="width: 35%;">Detalle de Tallas y Alertas</th>
+                                        <th style="width: 15%;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventoryTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- APARTADOS -->
+            <!-- MÓDULO F3 · APARTADOS: registro de apartados con abono y lista de clientes con saldo. -->
+            <div id="viewApartados" class="section-view">
+                <div class="workspace" style="grid-template-columns: 380px 1fr;">
+                    <div class="card-box">
+                        <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>Nuevo Apartado</h3>
+                        <!-- Formulario de nuevo apartado (envío en js/apartados.js). -->
+                        <form id="apartadoForm">
+                            <div class="form-group">
+                                <label>Cliente</label>
+                                <input type="text" id="clientName" placeholder="Nombre" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono</label>
+                                <input type="text" id="clientPhone" placeholder="Teléfono">
+                            </div>
+                            <div class="form-group">
+                                <label>Modelo</label>
+                                <select id="apartadoModelSelect" required onchange="loadApartadoVariants(this.value)">
+                                    <option value="">-- Elige modelo --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Talla y Color</label>
+                                <select id="apartadoVariantSelect" required onchange="autofillApartadoPrice()">
+                                    <option value="">-- Elige variante --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Total ($)</label>
+                                <input type="number" id="apartadoTotal" step="0.01" min="0.01" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Abono Inicial ($)</label>
+                                <input type="number" id="apartadoAbono" step="0.01" min="0" placeholder="0.00" required>
+                            </div>
+                            <button type="submit" class="btn btn-purple" style="width:100%; justify-content:center; padding:10px;">Guardar Apartado</button>
+                        </form>
+                    </div>
+
+                    <!-- Tabla de apartados y cuentas por cobrar. -->
+                    <div class="card-box">
+                        <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Cuentas por Cobrar y Clientes</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%;">Cliente</th>
+                                        <th style="width: 35%;">Detalle</th>
+                                        <th style="width: 20%;">Saldo</th>
+                                        <th style="width: 15%;">Estado</th>
+                                        <th style="width: 5%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="apartadosTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CAJA CHICA -->
+            <!-- MÓDULO F4 · CAJA CHICA: fondo fijo y gastos menores con control de saldo. -->
+            <div id="viewCajaChica" class="section-view">
+                <!-- Panel informativo del módulo. -->
+                <div class="info-panel">
+                    <b>📌 Regla Contable de Caja Chica:</b> Puedes agregar la cantidad de dinero que desees en tu fondo inicial o reabastecimiento. Se recomienda un saldo entre <b>$50.00 y $100.00 USD</b>. Reabastece cuando baje a <b>$10.00 (20%)</b>.
+                </div>
+
+                <!-- Métricas de caja chica: saldo disponible, estado, total ingresos y total gastos. -->
+                <div class="metrics-grid" id="ccMetricsGrid" style="margin-bottom: 20px;">
+                    <div class="metric-card" id="ccBalanceCard" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Saldo Actual en Caja Chica</div>
+                        <div class="value" id="ccBalance" style="color: var(--primary);">$0.00</div>
+                        <small id="ccAlertLabel" style="font-size:0.72rem; font-weight:700; color:var(--text-muted); display:block; margin-top:6px;">Fondo OK</small>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--border-light);">
+                        <div class="label">Fondo Sugerido</div>
+                        <div class="value" style="color: var(--text-main); font-size:1.35rem;">$50.00 - $100.00</div>
+                        <small style="font-size:0.72rem; color:var(--warning); display:block; margin-top:6px;">Alerta al llegar a $10.00</small>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--success);">
+                        <div class="label">Total Reabastecido / Ingresos</div>
+                        <div class="value" id="ccTotalIn" style="color: var(--success);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--danger);">
+                        <div class="label">Total Gastado de Caja Chica</div>
+                        <div class="value" id="ccTotalOut" style="color: var(--danger);">$0.00</div>
+                    </div>
+                </div>
+
+                <div class="workspace">
+                    <div class="card-box">
+                        <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>Gestión / Inyección de Dinero a Caja Chica</h3>
+                        <!-- Formulario de movimiento de caja chica (onsubmit llama a handleCajaChicaSubmit en js/cajaChica.js). -->
+                        <form id="cajaChicaForm" onsubmit="handleCajaChicaSubmit(event)">
+                            <div class="form-group">
+                                <label>Tipo de Operación</label>
+                                <select id="ccType" required onchange="handleCajaChicaTypeChange(this.value)">
+                                    <option value="ingreso">📥 Agregar Dinero / Reabastecer Fondo</option>
+                                    <option value="gasto">📤 Gasto de Caja Chica (Retiro Directo)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" id="ccCategoryGroup" style="display:none;">
+                                <label>Concepto de Gasto Autorizado (Obligatorio)</label>
+                                <select id="ccCategory" class="op-native">
+                                    <option value="Alimentación y Refrigerios">🍔 Alimentación y Refrigerios</option>
+                                    <option value="Papelería y Útiles de Oficina">📁 Papelería y Útiles de Oficina</option>
+                                    <option value="Artículos de Limpieza y Aseo">🧹 Artículos de Limpieza y Aseo</option>
+                                    <option value="Mensajería y Envíos Locales">🛵 Mensajería y Envíos Locales</option>
+                                    <option value="Reparaciones Menores / Ferretería">🔨 Reparaciones Menores / Ferretería</option>
+                                    <option value="Insumos de Emergencia Operativa">💡 Insumos de Emergencia Operativa</option>
+                                </select>
+                                <div class="op-grid cat-grid" data-for="ccCategory">
+                                    <button type="button" class="op-tile" data-val="Alimentación y Refrigerios" onclick="setCat('ccCategory',this)"><span class="oi">🍔</span><span><b>Alimentación y Refrigerios</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Papelería y Útiles de Oficina" onclick="setCat('ccCategory',this)"><span class="oi">📁</span><span><b>Papelería y Útiles de Oficina</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Artículos de Limpieza y Aseo" onclick="setCat('ccCategory',this)"><span class="oi">🧹</span><span><b>Artículos de Limpieza y Aseo</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Mensajería y Envíos Locales" onclick="setCat('ccCategory',this)"><span class="oi">🛵</span><span><b>Mensajería y Envíos Locales</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Reparaciones Menores / Ferretería" onclick="setCat('ccCategory',this)"><span class="oi">🔨</span><span><b>Reparaciones Menores / Ferretería</b></span></button>
+                                    <button type="button" class="op-tile" data-val="Insumos de Emergencia Operativa" onclick="setCat('ccCategory',this)"><span class="oi">💡</span><span><b>Insumos de Emergencia Operativa</b></span></button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Descripción / Detalle</label>
+                                <input type="text" id="ccDesc" placeholder="Ej. Inyección de $50 o compra de desinfectante" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Monto ($ USD)</label>
+                                <input type="number" id="ccAmount" step="0.01" min="0.01" placeholder="0.00" required>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:10px;">Registrar en Caja Chica</button>
+                        </form>
+                    </div>
+
+                    <!-- Tabla de movimientos de caja chica. -->
+                    <div class="card-box">
+                        <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Historial de Movimientos de Caja Chica</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%;">Fecha y Hora</th>
+                                        <th style="width: 20%;">Tipo</th>
+                                        <th style="width: 35%;">Concepto / Detalle</th>
+                                        <th style="width: 15%;">Monto</th>
+                                        <th style="width: 5%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cajaChicaTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTE POR RANGO DE FECHAS -->
+            <!-- MÓDULO F5 · REPORTES: balance y utilidad por rango de fechas. -->
+            <div id="viewReportes" class="section-view">
+                <!-- Selección del rango (inicio/fin) y atajos de periodo. -->
+                <div class="card-box" style="margin-bottom: 20px;">
+                    <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Filtrar Ventas y Ganancias por Rango de Fechas</h3>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <button class="btn btn-light" onclick="setReportShortcut(2)">⚡ Últimos 2 Días</button>
+                        <button class="btn btn-light" onclick="setReportShortcut(15)">📅 Última Quincena (15 Días)</button>
+                        <button class="btn btn-light" onclick="setReportShortcut(30)">🗓️ Último Mes (30 Días)</button>
+                    </div>
+
+                    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                        <div class="form-group" style="margin:0; flex: 1; min-width: 200px;">
+                            <label>Fecha de Inicio</label>
+                            <input type="date" id="reportStartDate">
+                        </div>
+                        <div class="form-group" style="margin:0; flex: 1; min-width: 200px;">
+                            <label>Fecha de Fin</label>
+                            <input type="date" id="reportEndDate">
+                        </div>
+                        <div style="margin-top: 18px;">
+                            <button class="btn btn-primary" onclick="generateDateRangeReport()">🔍 Generar Reporte</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Métricas del reporte (se muestran al generarlo): ventas, gastos de ropa, gastos de comida, gastos totales y utilidad. -->
+                <div class="metrics-grid" id="reportMetricsGrid" style="display: none;">
+                    <div class="metric-card" style="border-top: 2px solid var(--success);">
+                        <div class="label">Ventas de Ropa</div>
+                        <div class="value" id="repSales" style="color: var(--success);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Gasto en Ropa (Mercadería)</div>
+                        <div class="value" id="repExpenseClothing" style="color: var(--primary);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--warning);">
+                        <div class="label">Gasto en Comida (Caja Chica)</div>
+                        <div class="value" id="repExpenseFood" style="color: var(--warning);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Servicios Básicos (Luz, Agua, Internet)</div>
+                        <div class="value" id="repExpenseServices" style="color: var(--primary);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--warning);">
+                        <div class="label">Otros Gastos de Caja Chica</div>
+                        <div class="value" id="repExpenseOtherCC" style="color: var(--warning);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--danger);">
+                        <div class="label">Total Gastado (Desglosado)</div>
+                        <div class="value" id="repExpenseTotal" style="color: var(--danger);">$0.00</div>
+                        <small id="repExpenseSubdetail" style="font-size:0.72rem; color:var(--text-muted); display:block; margin-top:4px; font-family:var(--font-mono);">(Ropa: $0 | Comida: $0 | Servicios: $0 | Caja chica: $0)</small>
+                    </div>
+                    <div class="metric-card" style="grid-column: span 2; border-top: 2px solid var(--success);">
+                        <div class="label">Ganancia Neta de Ropa (Ventas - Mercadería)</div>
+                        <div class="value" id="repProfitClothing" style="color: var(--success); font-size: 1.8rem;">$0.00</div>
+                    </div>
+                </div>
+
+                <!-- Detalle de movimientos del rango generado. -->
+                <div class="card-box" id="reportTableContainer" style="display: none;">
+                    <h3><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h6"/></svg>Detalle de Operaciones en el Rango</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%;">Fecha</th>
+                                    <th style="width: 18%;">Tipo</th>
+                                    <th style="width: 32%;">Detalle Especificado</th>
+                                    <th style="width: 15%;">Monto Total</th>
+                                    <th style="width: 15%;">IVA (13%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Jornadas del periodo (calendario): días laborados, sin ventas, asueto y promedio de ventas por día laborado. La llena renderJornadasReport(). -->
+                <div id="jornadasSection" style="display: none; margin-top: 20px;">
+                    <div class="metrics-grid">
+                        <div class="metric-card" style="border-top: 2px solid var(--success);">
+                            <div class="label">Días Laborados</div>
+                            <div class="value" id="repDaysWorked" style="color: var(--success);">0</div>
+                        </div>
+                        <div class="metric-card" style="border-top: 2px solid var(--warning);">
+                            <div class="label">Días Sin Ventas</div>
+                            <div class="value" id="repDaysNoSales" style="color: var(--warning);">0</div>
+                        </div>
+                        <div class="metric-card" style="border-top: 2px solid var(--danger);">
+                            <div class="label">Días de Asueto / Feriado</div>
+                            <div class="value" id="repDaysHoliday" style="color: var(--danger);">0</div>
+                        </div>
+                        <div class="metric-card" style="border-top: 2px solid var(--primary);">
+                            <div class="label">Promedio de Ventas por Día Laborado</div>
+                            <div class="value" id="repAvgSales" style="color: var(--primary);">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="card-box">
+                        <h3><span><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Jornadas del periodo</span></h3>
+                        <div class="info-panel" id="repDaysUndef" style="margin-bottom: 14px;"></div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 22%;">Fecha</th>
+                                        <th style="width: 24%;">Estado</th>
+                                        <th style="width: 54%;">Nota / Motivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="jornadasBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ MÓDULO F6: CIERRE DE INVENTARIO ============ -->
+            <div id="viewCierre" class="section-view">
+                <!-- Valoración en vivo del alcance elegido (valor a costo = stock x costo). La llena renderClosurePreview(). -->
+                <div class="metrics-grid" id="closureMetricsGrid">
+                    <div class="metric-card" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Valor del Inventario (a Costo)</div>
+                        <div class="value" id="clsCost" style="color: var(--primary);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--success);">
+                        <div class="label">Valor a Precio de Venta</div>
+                        <div class="value" id="clsSale" style="color: var(--success);">$0.00</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--warning);">
+                        <div class="label">Unidades en Stock</div>
+                        <div class="value" id="clsUnits" style="color: var(--warning);">0</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Modelos / Variantes</div>
+                        <div class="value" id="clsModels" style="color: var(--primary);">0 / 0</div>
+                    </div>
+                </div>
+                <div class="info-panel is-warning" id="closureWarning" style="display: none;"></div>
+
+                <div class="workspace">
+                    <!-- Formulario del nuevo cierre (envío en js/cierre.js). -->
+                    <div class="card-box">
+                        <h3><span><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 13l2 2 4-4"/></svg>Nuevo Cierre</span></h3>
+                        <form id="closureForm" onsubmit="createInventoryClosure(event)">
+                            <div class="form-group">
+                                <label for="closureDate">Fecha del cierre</label>
+                                <input type="date" id="closureDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Alcance del cierre</label>
+                                <div class="pill-grid" id="closureScope"></div>
+                                <span class="field-hint">Sin categorías marcadas = cierre general. Marca una o varias para un cierre selectivo. El número es el stock actual.</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="closureNote">Nota (opcional)</label>
+                                <input type="text" id="closureNote" maxlength="120" placeholder="Ej. Cierre mensual de noviembre" autocomplete="off">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:10px;">Realizar Cierre de Inventario</button>
+                            <span class="field-hint">Guarda una fotografía del stock, costos y precios de hoy. No cambia aunque el inventario se modifique después.</span>
+                        </form>
+                    </div>
+
+                    <!-- Historial de cierres (snapshots de solo lectura). -->
+                    <div class="card-box">
+                        <h3><span><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historial de Cierres</span></h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 20%;">Fecha</th>
+                                        <th style="width: 34%;">Alcance</th>
+                                        <th style="width: 12%;">Unid.</th>
+                                        <th style="width: 18%;">Valor a Costo</th>
+                                        <th style="width: 16%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="closureHistoryBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ MÓDULO F7: CALENDARIO DE OPERACIONES ============ -->
+            <div id="viewCalendario" class="section-view">
+                <!-- Resumen del mes visible (lo llena renderCalendar()). -->
+                <div class="metrics-grid" id="calMetricsGrid">
+                    <div class="metric-card" style="border-top: 2px solid var(--success);">
+                        <div class="label">Días Laborados</div>
+                        <div class="value" id="calCntWorked" style="color: var(--success);">0</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--warning);">
+                        <div class="label">Días Sin Ventas</div>
+                        <div class="value" id="calCntNoSales" style="color: var(--warning);">0</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--danger);">
+                        <div class="label">Asueto / Feriados</div>
+                        <div class="value" id="calCntHoliday" style="color: var(--danger);">0</div>
+                    </div>
+                    <div class="metric-card" style="border-top: 2px solid var(--primary);">
+                        <div class="label">Sin Definir</div>
+                        <div class="value" id="calCntUndef" style="color: var(--primary);">0</div>
+                    </div>
+                </div>
+
+                <div class="card-box">
+                    <h3><span><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendario de Operaciones</span></h3>
+                    <div class="cal-toolbar">
+                        <div class="cal-nav">
+                            <button type="button" class="btn btn-light" onclick="changeCalMonth(-1)" aria-label="Mes anterior">‹</button>
+                            <div class="cal-title" id="calTitle" aria-live="polite"></div>
+                            <button type="button" class="btn btn-light" onclick="changeCalMonth(1)" aria-label="Mes siguiente">›</button>
+                        </div>
+                        <button type="button" class="btn btn-light" onclick="goCalToday()">Hoy</button>
+                    </div>
+                    <div class="cal-legend">
+                        <span><i class="lg-laborado"></i>Laborado</span>
+                        <span><i class="lg-sinventas"></i>Sin ventas</span>
+                        <span><i class="lg-asueto"></i>Asueto / Feriado</span>
+                        <span><i class="lg-sindefinir"></i>Sin definir</span>
+                    </div>
+                    <div class="cal-grid" id="calGrid"></div>
+                    <span class="field-hint" style="margin-top:12px;">Haz clic en un día para definir su estado y agregar una nota o motivo. Un día con ventas y sin estado se considera laborado automáticamente.</span>
+                </div>
+
+                <div class="card-box" style="margin-top: 20px;">
+                    <h3><span><svg class="h3-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Fechas Especiales del Mes</span></h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">Fecha</th>
+                                    <th style="width: 24%;">Estado</th>
+                                    <th style="width: 54%;">Nota / Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="calSpecialBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- PANEL LATERAL: navegación entre módulos (F1 a F7). -->
+        <aside class="modules-sidebar-right" aria-label="Navegación de Módulos">
+            <div class="sidebar-panel-card">
+                <div class="sidebar-header">
+                    <div class="sidebar-brand-badge">
+                        <svg class="sidebar-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>MÓDULOS DEL SISTEMA</span>
+                    </div>
+                    <h2 class="sidebar-title">Panel de Control</h2>
+                    <p class="sidebar-subtitle">Gestión Contable & Operativa</p>
+                </div>
+
+                <!-- Botones de módulo: cada uno llama a switchModule('<módulo>') (js/ui.js). -->
+                <nav class="main-modules" aria-label="Módulos del Sistema">
+                    <button class="module-btn active" id="btnModContable" onclick="switchModule('contable')" title="Ventas, Facturación y Caja">
+                        <span class="module-key-code">F1</span>
+                        <span class="module-icon-box icon-sales" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="18" height="13" x="3" y="4" rx="2"></rect>
+                                <path d="M5 8h14"></path>
+                                <path d="M8 12h.01M12 12h.01M16 12h.01"></path>
+                                <path d="M7 17v3a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3"></path>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Ventas y Caja</span>
+                            <span class="module-desc">POS, IVA y Arqueo</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+
+                    <button class="module-btn" id="btnModInventario" onclick="switchModule('inventario')" title="Inventario, Tallas y Stock">
+                        <span class="module-key-code">F2</span>
+                        <span class="module-icon-box icon-inventory" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m7.5 4.27 9 5.15"></path>
+                                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                                <path d="m3.3 7 8.7 5 8.7-5"></path>
+                                <path d="M12 22V12"></path>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Inventario y Stock</span>
+                            <span class="module-desc">Bodega y Alertas</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+
+                    <button class="module-btn" id="btnModApartados" onclick="switchModule('apartados')" title="Apartados y Cuentas por Cobrar">
+                        <span class="module-key-code">F3</span>
+                        <span class="module-icon-box icon-layaway" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M19 8v6"></path>
+                                <path d="M22 11h-6"></path>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Apartados</span>
+                            <span class="module-desc">Clientes y Abonos</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+
+                    <button class="module-btn" id="btnModCajaChica" onclick="switchModule('cajaChica')" title="Fondo Fijo y Gastos Menores">
+                        <span class="module-key-code">F4</span>
+                        <span class="module-icon-box icon-cash" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path>
+                                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Caja Chica</span>
+                            <span class="module-desc">Fondo y Gastos Menores</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+
+                    <button class="module-btn" id="btnModReportes" onclick="switchModule('reportes')" title="Reportes, Utilidad y Balances">
+                        <span class="module-key-code">F5</span>
+                        <span class="module-icon-box icon-reports" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3v18h18"></path>
+                                <path d="m19 9-5 5-4-4-3 3"></path>
+                                <circle cx="19" cy="9" r="1.5"></circle>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Reportes</span>
+                            <span class="module-desc">Balance y Utilidades</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+                    <button class="module-btn" id="btnModCierre" onclick="switchModule('cierre')" title="Valor del inventario y cierres por fecha">
+                        <span class="module-key-code">F6</span>
+                        <span class="module-icon-box icon-closure" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="4" width="14" height="17" rx="2"></rect>
+                                <path d="M9 4V3h6v1M9 13l2 2 4-4"></path>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Cierre de Inventario</span>
+                            <span class="module-desc">Valor y Snapshots</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+                    <button class="module-btn" id="btnModCalendario" onclick="switchModule('calendario')" title="Jornadas, asuetos y días sin ventas">
+                        <span class="module-key-code">F7</span>
+                        <span class="module-icon-box icon-calendar" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                                <path d="M3 10h18M8 3v4M16 3v4"></path>
+                            </svg>
+                        </span>
+                        <span class="module-info">
+                            <span class="module-name">Calendario</span>
+                            <span class="module-desc">Jornadas y Asuetos</span>
+                        </span>
+                        <span class="module-indicator" aria-hidden="true"></span>
+                    </button>
+                </nav>
+
+                <!-- Pie del panel: estado del sistema y leyenda de país / IVA. -->
+                <div class="sidebar-footer-info">
+                    <div class="system-status-pill">
+                        <span class="pulse-dot"></span>
+                        <span class="status-name">Sistema Operativo</span>
+                    </div>
+                    <div class="system-meta-text">El Salvador • IVA 13% Incl.</div>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+
+<!-- Scripts clásicos (sin módulos) que comparten el mismo ámbito global, igual que el <script> original. -->
+<!-- El ORDEN importa: el estado primero y el arranque (main.js) al final. -->
+<script src="js/state.js"></script>      <!-- Estado global y persistencia (localStorage) -->
+<script src="js/ui.js"></script>         <!-- Navegación de módulos y utilidades de interfaz -->
+<script src="js/dialogs.js"></script>    <!-- Toasts y diálogos modales (reemplazan alert/confirm) -->
+<script src="js/contable.js"></script>   <!-- Módulo F1: Contable -->
+<script src="js/inventory.js"></script>  <!-- Módulo F2: Inventario -->
+<script src="js/apartados.js"></script>  <!-- Módulo F3: Apartados -->
+<script src="js/cajaChica.js"></script>  <!-- Módulo F4: Caja Chica -->
+<script src="js/calendar.js"></script>   <!-- Módulo F7: Calendario de operaciones -->
+<script src="js/cierre.js"></script>     <!-- Módulo F6: Cierre de inventario -->
+<script src="js/reports.js"></script>    <!-- Módulo F5: Reportes y exportación CSV -->
+<script src="js/main.js"></script>       <!-- Arranque de la aplicación -->
+</body>
+</html>

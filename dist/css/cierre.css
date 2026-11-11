@@ -1,0 +1,183 @@
+/* ==========================================================================
+   Cierre de Caja y Cierre de Inventario
+   Sub-pestañas, arqueo de billetes y monedas, indicadores de cuadre y tickets.
+   ======================================================================= */
+
+.cierre-subnav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+}
+
+.cierre-subnav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-body);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-smooth);
+}
+
+.cierre-subnav-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-main);
+}
+
+.cierre-subnav-btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Grilla de denominaciones de billetes y monedas */
+.denominations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    margin: 12px 0 16px;
+}
+
+.denom-card {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.denom-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.denom-input {
+    width: 100%;
+    padding: 6px;
+    font-weight: 700;
+    text-align: center;
+    font-family: var(--font-mono);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--surface);
+    color: var(--text-main);
+}
+
+/* Cuadre de caja */
+.cuadre-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    margin-top: 10px;
+    width: 100%;
+    justify-content: center;
+}
+
+.cuadre-status-badge.is-ok {
+    background: #E1EBDC;
+    color: #2F4A38;
+    border: 1px solid #B8CDB2;
+}
+
+.cuadre-status-badge.is-surplus {
+    background: #E6F0FA;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+}
+
+.cuadre-status-badge.is-deficit {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+}
+
+.closure-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.closure-actions .btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+}
+
+.closure-scope-cats {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.field-hint {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.dlg-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.dlg-stat {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+}
+
+.dlg-stat small {
+    display: block;
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+}
+
+.dlg-stat b {
+    display: block;
+    margin-top: 2px;
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-main);
+    font-variant-numeric: tabular-nums;
+}
+
+.dlg-meta {
+    margin: 0 0 12px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.dlg-body .table-container {
+    max-height: 320px;
+    overflow-y: auto;
+}

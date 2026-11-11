@@ -1,0 +1,24 @@
+/* ==========================================================================
+   Botones
+   Estilos del botón base .btn y de sus variantes de color con sus estados :hover.
+   ======================================================================= */
+
+        /* Botón base (.btn) y sus variantes de color: primary, success, danger, warning, purple y light. */
+        .btn {
+            padding: 8px 16px; border-radius: var(--radius-md); font-size: 0.82rem; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+            gap: 7px; transition: var(--transition-smooth); outline: none; font-family: var(--font-sans);
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: var(--primary); color: #FFFFFF; border-color: var(--primary); box-shadow: 0 1px 2px rgba(79, 111, 82, 0.15); }
+        .btn-primary:hover { background: #2F4A38; border-color: #2F4A38; box-shadow: 0 4px 10px -2px rgba(79, 111, 82, 0.40); }
+        .btn-success { background: #D9B26F; border-color: #F59E0B; color: #3F3018; box-shadow: 0 1px 2px rgba(245, 158, 11, 0.35); }
+        .btn-success:hover { background: #F59E0B; border-color: #B58A3C; color: #3F3018; box-shadow: 0 4px 10px -2px rgba(245, 158, 11, 0.45); }
+        .btn-danger { background: #F8EBE4; color: #7E3F27; border: 1px solid #EBCDBE; }
+        .btn-danger:hover { background: #B2603F; color: #FFFFFF; border-color: #B2603F; }
+        .btn-warning { background: #E8C58A; color: #5F4519; border-color: #CFA458; }
+        .btn-warning:hover { background: #CFA458; color: #5F4519; border-color: #BF9344; }
+        .btn-purple { background: #42705A; border-color: #42705A; color: #FFFFFF; box-shadow: 0 1px 2px rgba(66, 112, 90, 0.25); }
+        .btn-purple:hover { background: #3A6350; border-color: #3A6350; color: #FFFFFF; box-shadow: 0 4px 10px -2px rgba(66, 112, 90, 0.40); }
+        .btn-light { background: var(--surface); color: var(--text-body); border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
+        .btn-light:hover { background: var(--surface-hover); border-color: var(--border-hover); color: var(--text-main); }

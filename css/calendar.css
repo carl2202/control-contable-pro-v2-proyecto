@@ -1,0 +1,67 @@
+/* ==========================================================================
+   Calendario de operaciones
+   Calendario mensual (.cal-grid), celdas por estado de jornada, leyenda, editor del día
+   y la etiqueta de jornada que aparece en la barra de fecha del módulo Contable.
+   Estados: laborado (verde salvia), sin ventas (ocre), asueto / feriado (terracota).
+   ======================================================================= */
+
+        /* Barra superior del calendario: navegación de mes y botón "Hoy". */
+        .cal-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+        .cal-nav { display: flex; align-items: center; gap: 8px; }
+        .cal-nav .btn { padding: 6px 10px; }
+        .cal-title { min-width: 200px; text-align: center; text-transform: capitalize; font-family: 'Source Serif 4', Georgia, serif; font-size: 1.2rem; font-weight: 600; color: var(--text-main); }
+
+        /* Leyenda de colores. */
+        .cal-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 14px; font-size: 0.72rem; font-weight: 500; color: var(--text-muted); }
+        .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .cal-legend i { width: 10px; height: 10px; border-radius: 3px; border: 1px solid transparent; display: inline-block; }
+        .cal-legend .lg-laborado { background: #4F6F52; }
+        .cal-legend .lg-sinventas { background: #B58A3C; }
+        .cal-legend .lg-asueto { background: #B2603F; }
+        .cal-legend .lg-sindefinir { background: var(--surface); border-color: var(--border-hover); }
+
+        /* Rejilla de 7 columnas (Lun..Dom) y encabezados de día de la semana. */
+        .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+        .cal-dow { text-align: center; padding: 6px 0; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+
+        /* Celda de un día: es un botón (se puede usar con teclado). El borde izquierdo y el fondo indican el estado. */
+        .cal-day {
+            min-height: 96px; padding: 8px 9px; display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer;
+            background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border-hover); border-radius: var(--radius-md);
+            color: var(--text-body); font: inherit; box-shadow: var(--shadow-xs); transition: var(--transition-smooth); min-width: 0;
+        }
+        .cal-day:hover { transform: translateY(-1px); border-color: #B8CDB2; box-shadow: var(--shadow-md); }
+        .cal-day:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-glow); border-color: var(--primary); }
+        .cal-day.empty { visibility: hidden; pointer-events: none; }
+        .cal-day .d-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+        .cal-day .d-num { font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--text-main); }
+        .cal-day .d-tag { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 6px; border-radius: var(--radius-xs); border: 1px solid transparent; white-space: nowrap; }
+        .cal-day .d-note { font-size: 0.7rem; line-height: 1.3; color: var(--text-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+        .cal-day .d-sales { margin-top: auto; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; color: var(--primary-dark); }
+        .cal-day.today { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
+        .cal-day.today .d-num { background: var(--primary); color: #FFFFFF; border-radius: var(--radius-full); padding: 0 7px; }
+
+        .cal-day[data-st="laborado"] { background: #F2F6EE; border-color: #CBDCC5; border-left-color: #4F6F52; }
+        .cal-day[data-st="laborado"] .d-tag { background: #E1EBDC; color: #2F4A38; border-color: #B8CDB2; }
+        .cal-day[data-st="sinventas"] { background: #FBF3E1; border-color: #EBD6A4; border-left-color: #B58A3C; }
+        .cal-day[data-st="sinventas"] .d-tag { background: #F6E6C8; color: #7A5A1F; border-color: #E8C58A; }
+        .cal-day[data-st="asueto"] { background: #F8EBE4; border-color: #EBCDBE; border-left-color: #B2603F; }
+        .cal-day[data-st="asueto"] .d-tag { background: #F1D6C8; color: #7E3F27; border-color: #EBCDBE; }
+
+        /* Etiqueta de jornada en la barra de fecha del módulo Contable (#dayStatusBadge). */
+        .day-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+        .day-status .day-status-note { font-size: 0.76rem; color: var(--text-muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .day-status .btn { padding: 4px 10px; font-size: 0.72rem; }
+
+        /* Editor de un día (contenido del diálogo). */
+        .day-editor-date { font-family: 'Source Serif 4', Georgia, serif; font-size: 1.05rem; font-weight: 600; color: var(--text-main); }
+        .day-editor-date::first-letter { text-transform: uppercase; }
+        .day-editor-meta { margin: 2px 0 16px; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); }
+        .day-editor .dlg-label { display: block; margin-bottom: 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-body); }
+        .day-editor .pill-grid { margin: 4px 0 14px; }
+        .day-editor .pill-grid .op-tile.active[data-st="laborado"] { background: #E1EBDC; border-color: #4F6F52; }
+        .day-editor .pill-grid .op-tile.active[data-st="sinventas"] { background: #F6E6C8; border-color: #B58A3C; }
+        .day-editor .pill-grid .op-tile.active[data-st="asueto"] { background: #F1D6C8; border-color: #B2603F; }
+        .day-editor .day-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+        .day-editor .day-suggestions .cat-chip { padding: 3px 10px; font-size: 0.7rem; }
+        .day-editor .form-group { margin-bottom: 10px; }
