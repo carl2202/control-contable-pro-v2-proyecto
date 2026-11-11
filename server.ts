@@ -59,3 +59,6 @@ startServer().catch((err) => {
   console.error('Failed to start server:', err);
   process.exit(1);
 });
+
+// Exportación requerida para que Vercel ejecute Express como Serverless Function
+export default app;
