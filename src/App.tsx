@@ -12,34 +12,35 @@ import { CajaChicaModule } from './components/modules/CajaChicaModule';
 import { ReportsModule } from './components/modules/ReportsModule';
 import { CierreModule } from './components/modules/CierreModule';
 import { CalendarModule } from './components/modules/CalendarModule';
+import AdminPanel from './components/admin/AdminPanel';
+import GlobalSearch from './components/GlobalSearch';
+import CookieBanner, { useCookieConsent } from './components/CookieBanner';
 import { exportComprehensiveBackupCSV } from './utils/exportCsv';
 
 // ============================================================
 // MainApp — componente raíz interno (requiere AuthContext activo)
 // ============================================================
-// Gestiona el módulo activo, los atajos de teclado F1–F7 y la
-// pantalla de bloqueo que exige autenticación antes de usar el
-// sistema. El LoginModal se muestra SIEMPRE que no hay sesión
-// iniciada (isOpen controlado por la ausencia de user).
-// ============================================================
 function MainApp() {
-  // Módulo visible actualmente (F1=contable … F7=calendario)
   const [activeModule, setActiveModule] = useState<ActiveModule>('contable');
-
-  // Controla si el modal de login está abierto manualmente
-  // (p.ej. para cambiar de rol desde el encabezado).
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
-  // user: null = sin sesión; objeto = sesión activa con rol.
-  const { user, loading } = useAuth();
+  const { user, loading, isOwner } = useAuth();
   const { showToast } = useFeedback();
+  const { consented } = useCookieConsent();
 
   // ──────────────────────────────────────────────────────────
-  // Efecto: atajos de teclado F1–F7 para cambiar de módulo.
-  // Se ignoran si el foco está en un campo de texto.
+  // Atajos de teclado: F1–F7 para módulos, Ctrl+K para buscador
   // ──────────────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Shortcut Ctrl + K o Cmd + K para el buscador global
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+        return;
+      }
+
       // No interceptar si el usuario escribe en un campo de formulario
       const target = e.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
@@ -50,7 +51,6 @@ function MainApp() {
         case 'F3': e.preventDefault(); setActiveModule('apartados');  break;
         case 'F4': e.preventDefault(); setActiveModule('cajaChica');  break;
         case 'F5':
-          // Alt+F5 cambia a Reportes; F5 solo recarga el navegador normalmente
           if (e.altKey) { e.preventDefault(); setActiveModule('reportes'); }
           break;
         case 'F6': e.preventDefault(); setActiveModule('cierre');     break;
@@ -62,9 +62,6 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // ──────────────────────────────────────────────────────────
-  // Exportar respaldo CSV con feedback de toast al usuario.
-  // ──────────────────────────────────────────────────────────
   const handleExportBackup = async () => {
     try {
       showToast('Generando respaldo integral en CSV...', false, 'info');
@@ -75,10 +72,6 @@ function MainApp() {
     }
   };
 
-  // ──────────────────────────────────────────────────────────
-  // Pantalla de carga mientras AuthContext verifica la sesión
-  // guardada en localStorage (evita flash de login innecesario).
-  // ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -96,7 +89,6 @@ function MainApp() {
         }}
         aria-label="Cargando sistema..."
       >
-        {/* Spinner SVG animado — sin dependencias externas */}
         <svg
           width="40"
           height="40"
@@ -112,19 +104,17 @@ function MainApp() {
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
         </svg>
-        <span>Verificando sesión...</span>
+        <span>Verificando sesión segura...</span>
       </div>
     );
   }
 
   // ──────────────────────────────────────────────────────────
-  // PANTALLA DE BLOQUEO: si no hay sesión activa, se muestra
-  // únicamente la pantalla de inicio de sesión.
-  // El usuario NO puede acceder a ningún módulo sin autenticarse.
+  // PANTALLA DE BLOQUEO / ACCESO:
+  // Si no hay cookies aceptadas o no hay sesión, se protege el acceso.
   // ──────────────────────────────────────────────────────────
-  if (!user) {
+  if (!consented || !user) {
     return (
-      /* Fondo de bloqueo con gradiente suave del tema */
       <div
         style={{
           minHeight: '100vh',
@@ -137,9 +127,7 @@ function MainApp() {
         }}
         aria-label="Pantalla de acceso al sistema"
       >
-        {/* Logo / título de la tienda en la pantalla de bloqueo */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          {/* Ícono de tienda SVG */}
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div
             style={{
               width: '64px',
@@ -171,7 +159,7 @@ function MainApp() {
           </div>
           <h1
             style={{
-              fontSize: '1.3rem',
+              fontSize: '1.4rem',
               fontWeight: 700,
               color: 'var(--text-main)',
               margin: '0 0 4px',
@@ -180,47 +168,68 @@ function MainApp() {
           >
             Control Contable Pro
           </h1>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Tienda de Ropa • El Salvador • IVA 13%
+          <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            Tienda de Ropa • El Salvador • IVA 13% • Cajas & Inventario
           </p>
         </div>
 
-        {/* Tarjeta del formulario de acceso */}
         <div
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-xl)',
-            boxShadow: '0 20px 40px -10px rgba(47,58,51,0.12)',
+            boxShadow: 'var(--shadow-lg)',
             padding: '32px 28px',
             width: '100%',
-            maxWidth: '400px',
+            maxWidth: '420px',
           }}
         >
-          {/* El LoginModal reutilizable se usa aquí en modo embebido */}
-          <LoginModal isOpen={true} onClose={() => {}} isEmbedded={true} />
+          {consented ? (
+            <LoginModal isOpen={true} onClose={() => {}} isEmbedded={true} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+              <div style={{ marginBottom: '16px', color: 'var(--primary)' }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto' }}>
+                  <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+                  <path d="M8.5 8.5v.01M16 15.5v.01M12 12v.01" />
+                </svg>
+              </div>
+              <h2 style={{ fontSize: '1.1rem', margin: '0 0 8px', color: 'var(--text-main)' }}>
+                Consentimiento de Cookies Requerido
+              </h2>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 20px' }}>
+                Para garantizar la seguridad de sus sesiones y la protección de sus datos contables, el sistema requiere almacenar cookies técnicas esenciales.
+              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', margin: 0 }}>
+                Por favor, acepte el banner flotante en la parte inferior para habilitar el formulario de inicio de sesión.
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Pie de crédito */}
         <p style={{ marginTop: '24px', fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
-          Acceso protegido por PIN • Solo personal autorizado
+          Acceso protegido por credenciales seguras • Sesiones con cierre automático por inactividad
         </p>
+
+        {/* Banner de cookies visible siempre que no se haya aceptado */}
+        <CookieBanner />
       </div>
     );
   }
 
   // ──────────────────────────────────────────────────────────
-  // APLICACIÓN PRINCIPAL — solo visible con sesión activa.
+  // APLICACIÓN PRINCIPAL (Sesión activa y cookies aceptadas)
   // ──────────────────────────────────────────────────────────
   return (
     <div className="container min-h-screen py-4 px-2 sm:px-4">
-      {/* Encabezado con marca, estado de sesión y botón de exportar */}
+      {/* Encabezado con estado, tema, sincronización y buscador */}
       <Header
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onExportCSV={handleExportBackup}
+        onOpenSearch={() => setIsSearchOpen(true)}
       />
 
-      {/* Rejilla principal: módulo activo (izq.) + panel de navegación (der.) */}
+      {/* Rejilla principal */}
       <div className="app-layout">
         <main className="main-content-area">
           {activeModule === 'contable'   && <ContableModule />}
@@ -230,20 +239,34 @@ function MainApp() {
           {activeModule === 'reportes'   && <ReportsModule onExportCSV={handleExportBackup} />}
           {activeModule === 'cierre'     && <CierreModule />}
           {activeModule === 'calendario' && <CalendarModule />}
+          {activeModule === 'admin' && isOwner && <AdminPanel />}
         </main>
 
-        {/* Barra lateral derecha: botones F1–F7 de módulos */}
+        {/* Barra lateral de navegación F1–F7 + Admin */}
         <Sidebar
           activeModule={activeModule}
           onSelectModule={(mod) => setActiveModule(mod)}
         />
       </div>
 
-      {/* Modal de cambio de rol / re-autenticación (solo cuando ya hay sesión) */}
+      {/* Modal de re-autenticación / cambio de rol */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
       />
+
+      {/* Buscador Global Inteligente (Ctrl + K) */}
+      <GlobalSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onNavigate={(mod) => {
+          setActiveModule(mod);
+          setIsSearchOpen(false);
+        }}
+      />
+
+      {/* Banner de cookies flotante (por si aún no se ha aceptado) */}
+      <CookieBanner />
     </div>
   );
 }

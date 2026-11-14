@@ -1,33 +1,86 @@
 /* ==========================================================================
-   Adaptación a pantallas (responsive)
+   Adaptación a pantallas (responsive & mobile-first)
    Reglas finales de rejillas por módulo y media queries. Se carga ÚLTIMA para poder sobrescribir.
    ======================================================================= */
 
-        /* Rejillas específicas de las métricas de Reportes y de Caja Chica. */
-        #reportMetricsGrid { grid-template-columns: repeat(6, 1fr); }
-        #reportMetricsGrid .metric-card { grid-column: span 2 !important; }
-        #reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
-        #ccMetricsGrid { grid-template-columns: repeat(2, 1fr); }
+/* Rejillas específicas de las métricas de Reportes y de Caja Chica. */
+#reportMetricsGrid { grid-template-columns: repeat(6, 1fr); }
+#reportMetricsGrid .metric-card { grid-column: span 2 !important; }
+#reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
+#ccMetricsGrid { grid-template-columns: repeat(2, 1fr); }
 
-        /* Media queries: adaptan la rejilla, el padding y las columnas en pantallas menores a 1200, 990, 900, 700 y 560px. */
-        @media (max-width: 1200px) {
-            .app-layout { grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
-            .workspace { grid-template-columns: 380px minmax(0, 1fr); }
-        }
-        @media (max-width: 990px) { body { padding: 16px; } .workspace { grid-template-columns: 1fr !important; } }
-        @media (max-width: 900px) {
-            .app-layout { grid-template-columns: 1fr; }
-            .modules-sidebar-right { position: static; order: -1; }
-            .main-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
-            #reportMetricsGrid { grid-template-columns: repeat(2, 1fr); }
-            #reportMetricsGrid .metric-card { grid-column: span 1 !important; }
-            #reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
-        }
-        @media (max-width: 700px) {
-            #ccMetricsGrid { grid-template-columns: 1fr; }
-            /* Calendario: celdas más compactas y sin texto de nota (queda disponible al abrir el día). */
-            .cal-day { min-height: 62px; padding: 6px; }
-            .cal-day .d-note, .cal-day .d-tag { display: none; }
-            .cal-title { min-width: 0; font-size: 1.05rem; }
-        }
-        @media (max-width: 560px) { .op-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Contenedor general de tablas para scroll horizontal fluido en móvil */
+.table-responsive-container,
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+}
+
+/* Media queries: adaptan la rejilla, el padding y las columnas en pantallas menores */
+@media (max-width: 1200px) {
+    .app-layout { grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
+    .workspace { grid-template-columns: 380px minmax(0, 1fr); }
+}
+
+@media (max-width: 990px) {
+    body { padding: 12px; }
+    .workspace { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 900px) {
+    .app-layout { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+    .modules-sidebar-right { position: static; order: -1; width: 100%; margin-bottom: 16px; }
+    .main-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    #reportMetricsGrid { grid-template-columns: repeat(2, 1fr); }
+    #reportMetricsGrid .metric-card { grid-column: span 1 !important; }
+    #reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
+}
+
+@media (max-width: 768px) {
+    /* Optimización táctil para móviles: botones mínimo 44x48px */
+    .btn,
+    button[type="button"],
+    button[type="submit"],
+    .module-btn {
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+
+    input,
+    select,
+    textarea {
+        min-height: 44px;
+        font-size: 16px !important; /* Previene auto-zoom en iOS Safari */
+    }
+
+    .terminal-brand-area {
+        padding: 14px 16px;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .table-responsive-container table {
+        min-width: 600px; /* Asegura scroll horizontal en vez de aplastar columnas */
+    }
+}
+
+@media (max-width: 700px) {
+    #ccMetricsGrid { grid-template-columns: 1fr; }
+    /* Calendario: celdas más compactas y sin texto de nota */
+    .cal-day { min-height: 62px; padding: 6px; }
+    .cal-day .d-note, .cal-day .d-tag { display: none; }
+    .cal-title { min-width: 0; font-size: 1.05rem; }
+}
+
+@media (max-width: 560px) {
+    .op-grid { grid-template-columns: repeat(2, 1fr); }
+    .main-modules { grid-template-columns: repeat(2, 1fr); }
+    .module-btn { padding: 8px 10px; }
+    .module-info .module-desc { display: none; }
+}

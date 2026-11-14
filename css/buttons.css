@@ -1,24 +1,153 @@
 /* ==========================================================================
-   Botones
-   Estilos del botón base .btn y de sus variantes de color con sus estados :hover.
+   Botones — Diseño Corporativo Moderno con Micro-interacciones
    ======================================================================= */
 
-        /* Botón base (.btn) y sus variantes de color: primary, success, danger, warning, purple y light. */
-        .btn {
-            padding: 8px 16px; border-radius: var(--radius-md); font-size: 0.82rem; font-weight: 600;
-            border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-            gap: 7px; transition: var(--transition-smooth); outline: none; font-family: var(--font-sans);
-        }
-        .btn:hover { transform: translateY(-1px); }
-        .btn-primary { background: var(--primary); color: #FFFFFF; border-color: var(--primary); box-shadow: 0 1px 2px rgba(79, 111, 82, 0.15); }
-        .btn-primary:hover { background: #2F4A38; border-color: #2F4A38; box-shadow: 0 4px 10px -2px rgba(79, 111, 82, 0.40); }
-        .btn-success { background: #D9B26F; border-color: #F59E0B; color: #3F3018; box-shadow: 0 1px 2px rgba(245, 158, 11, 0.35); }
-        .btn-success:hover { background: #F59E0B; border-color: #B58A3C; color: #3F3018; box-shadow: 0 4px 10px -2px rgba(245, 158, 11, 0.45); }
-        .btn-danger { background: #F8EBE4; color: #7E3F27; border: 1px solid #EBCDBE; }
-        .btn-danger:hover { background: #B2603F; color: #FFFFFF; border-color: #B2603F; }
-        .btn-warning { background: #E8C58A; color: #5F4519; border-color: #CFA458; }
-        .btn-warning:hover { background: #CFA458; color: #5F4519; border-color: #BF9344; }
-        .btn-purple { background: #42705A; border-color: #42705A; color: #FFFFFF; box-shadow: 0 1px 2px rgba(66, 112, 90, 0.25); }
-        .btn-purple:hover { background: #3A6350; border-color: #3A6350; color: #FFFFFF; box-shadow: 0 4px 10px -2px rgba(66, 112, 90, 0.40); }
-        .btn-light { background: var(--surface); color: var(--text-body); border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
-        .btn-light:hover { background: var(--surface-hover); border-color: var(--border-hover); color: var(--text-main); }
+/* Botón base (.btn) y variantes con transiciones de alta fidelidad */
+.btn {
+    position: relative;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    outline: none;
+    font-family: var(--font-sans);
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.btn:hover {
+    transform: translateY(-1.5px);
+}
+
+.btn:active {
+    transform: translateY(1px) scale(0.98);
+}
+
+.btn:focus-visible {
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+/* Primario: Verde salvia sobrio */
+.btn-primary {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+    box-shadow: 0 2px 4px rgba(79, 111, 82, 0.2);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    box-shadow: 0 6px 14px -2px rgba(79, 111, 82, 0.35);
+}
+
+.btn-primary:active {
+    background: var(--primary-dark);
+    box-shadow: 0 1px 2px rgba(79, 111, 82, 0.2);
+}
+
+/* Secundario / Outline */
+.btn-outline {
+    background: transparent;
+    color: var(--text-body);
+    border: 1px solid var(--border);
+}
+
+.btn-outline:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-hover);
+    color: var(--text-main);
+}
+
+.btn-outline:active {
+    background: var(--surface-active);
+}
+
+/* Éxito / Dorado ocre sobrio */
+.btn-success {
+    background: #4F6F52;
+    border-color: #4F6F52;
+    color: #FFFFFF;
+    box-shadow: 0 2px 4px rgba(79, 111, 82, 0.2);
+}
+
+.btn-success:hover {
+    background: #3B543D;
+    border-color: #3B543D;
+    color: #FFFFFF;
+    box-shadow: 0 6px 14px -2px rgba(79, 111, 82, 0.35);
+}
+
+/* Peligro / Terracota */
+.btn-danger {
+    background: rgba(178, 96, 63, 0.12);
+    color: var(--danger);
+    border: 1px solid rgba(178, 96, 63, 0.25);
+}
+
+.btn-danger:hover {
+    background: var(--danger);
+    color: #FFFFFF;
+    border-color: var(--danger);
+    box-shadow: 0 4px 12px -2px rgba(178, 96, 63, 0.35);
+}
+
+/* Warning / Alerta */
+.btn-warning {
+    background: rgba(181, 138, 60, 0.15);
+    color: #7A5A1F;
+    border: 1px solid rgba(181, 138, 60, 0.3);
+}
+
+.btn-warning:hover {
+    background: var(--warning);
+    color: #FFFFFF;
+    border-color: var(--warning);
+}
+
+/* Light / Superficie neutral */
+.btn-light {
+    background: var(--surface);
+    color: var(--text-body);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-xs);
+}
+
+.btn-light:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-hover);
+    color: var(--text-main);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Botones de acción en tablas */
+.btn-table-action {
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    border-radius: var(--radius-xs);
+    transition: all 0.16s ease;
+}
+
+.btn-table-action:hover {
+    transform: scale(1.04);
+}
+
+/* Módulo botones en Sidebar */
+.module-btn {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.module-btn:hover {
+    transform: translateX(3px);
+}
+
+.module-btn:active {
+    transform: scale(0.99);
+}

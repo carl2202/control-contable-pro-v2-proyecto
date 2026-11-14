@@ -34,6 +34,8 @@ interface AuthContextType {
   isEmployee: boolean;
   /** Autentica con un PIN y un rol; devuelve {success, error?}. */
   loginWithPin: (pin: string, role?: Role) => Promise<{ success: boolean; error?: string }>;
+  /** Registra un nuevo negocio y usuario dueño en la nube con aislamiento de datos. */
+  registerUser: (data: { username: string; password: string; businessName: string }) => Promise<{ success: boolean; error?: string }>;
   /** Cierra la sesión actual limpiando token y usuario. */
   logout: () => Promise<void>;
   /** Refresca los datos del usuario desde el servidor. */
@@ -113,6 +115,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ── registerUser ───────────────────────────────────────────
+  const registerUser = async (data: {
+    username: string;
+    password: string;
+    businessName: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await AuthService.register(data);
+      setUser(res.user);
+      setToken(res.token);
+      return { success: true };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.message || 'Error al registrar la cuenta.',
+      };
+    }
+  };
+
   // ── logout ─────────────────────────────────────────────────
   // Invalida la sesión en el servidor y limpia el estado local.
   const logout = async () => {
@@ -127,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, isOwner, isEmployee, loginWithPin, logout, refreshUser }}
+      value={{ user, token, loading, isOwner, isEmployee, loginWithPin, registerUser, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

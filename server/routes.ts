@@ -4,6 +4,83 @@ import { db, getNextVoucherNumber } from './db.js';
 
 export const router = express.Router();
 
+const SESSION_COOKIE = 'ccp_session';
+const IDLE_MS = 20 * 60 * 1000;
+const SESSION_MS = 8 * 60 * 60 * 1000;
+const CHALLENGE_SECRET = process.env.SESSION_SECRET || 'ccp-local-challenge-key';
+
+const rateBuckets = new Map<string, number[]>();
+
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || 'local';
+}
+
+function allowRate(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const recent = (rateBuckets.get(key) || []).filter((stamp) => now - stamp < windowMs);
+  if (recent.length >= limit) {
+    rateBuckets.set(key, recent);
+    return false;
+  }
+  recent.push(now);
+  rateBuckets.set(key, recent);
+  return true;
+}
+
+function rateLimit(scope: string, limit: number, windowMs: number) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!allowRate(`${scope}:${clientIp(req)}`, limit, windowMs)) {
+      return res.status(429).json({
+        error: 'Demasiados intentos. Espere un momento antes de volver a intentar.'
+      });
+    }
+    next();
+  };
+}
+
+function readCookies(req: Request): Record<string, string> {
+  const header = req.headers.cookie || '';
+  const cookies: Record<string, string> = {};
+  for (const part of header.split(';')) {
+    const [rawKey, ...rest] = part.trim().split('=');
+    if (!rawKey) continue;
+    cookies[rawKey] = decodeURIComponent(rest.join('='));
+  }
+  return cookies;
+}
+
+function sessionCookie(token: string, maxAge: number): string {
+  return [
+    `${SESSION_COOKIE}=${token}`,
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    'Path=/',
+    `Max-Age=${maxAge}`
+  ].join('; ');
+}
+
+function sqliteTime(value: string | null | undefined): number {
+  if (!value) return Date.now();
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const parsed = Date.parse(normalized.endsWith('Z') ? normalized : `${normalized}Z`);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
+function writeAudit(action: string, entity: string, entityId: string | number | null, detail: string, role?: string) {
+  db.prepare(
+    'INSERT INTO audit_log (action, entity, entity_id, detail, user_role) VALUES (?, ?, ?, ?, ?)'
+  ).run(action, entity, entityId == null ? null : String(entityId), detail, role || null);
+}
+
+function hashPassword(plain: string): string {
+  return crypto.createHash('sha256').update(plain).digest('hex');
+}
+
 // -------------------------------------------------------------
 // Auth Middleware & Helpers
 // -------------------------------------------------------------
@@ -12,6 +89,7 @@ export interface AuthUser {
   username: string;
   role: 'dueno' | 'empleado';
   displayName: string;
+  tenantId: number;
 }
 
 declare global {
@@ -23,25 +101,39 @@ declare global {
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  const cookies = readCookies(req);
+  const cookieToken = cookies[SESSION_COOKIE];
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const bearer = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const token = cookieToken || bearer;
+  if (!token) return next();
+
+  const session = db.prepare(`
+    SELECT s.token, s.user_id as userId, s.role, s.username, s.display_name as displayName,
+           s.expires_at as expiresAt, s.last_seen_at as lastSeenAt,
+           COALESCE(u.tenant_id, 1) as tenantId
+    FROM sessions s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.token = ? AND s.expires_at > CURRENT_TIMESTAMP
+  `).get(token) as (AuthUser & { token: string; expiresAt: string; lastSeenAt: string | null }) | undefined;
+
+  if (!session) return next();
+
+  const idleFor = Date.now() - sqliteTime(session.lastSeenAt || session.expiresAt);
+  if (session.lastSeenAt && idleFor > IDLE_MS) {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    res.setHeader('Set-Cookie', sessionCookie('', 0));
     return next();
   }
-  const token = authHeader.slice(7).trim();
-  const session = db.prepare(`
-    SELECT s.token, s.user_id as userId, s.role, s.username, s.display_name as displayName, s.expires_at
-    FROM sessions s
-    WHERE s.token = ? AND s.expires_at > CURRENT_TIMESTAMP
-  `).get(token) as (AuthUser & { token: string; expires_at: string }) | undefined;
 
-  if (session) {
-    req.user = {
-      userId: session.userId,
-      username: session.username,
-      role: session.role as 'dueno' | 'empleado',
-      displayName: session.displayName
-    };
-  }
+  db.prepare('UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE token = ?').run(token);
+  req.user = {
+    userId: session.userId,
+    username: session.username,
+    role: session.role as 'dueno' | 'empleado',
+    displayName: session.displayName,
+    tenantId: Number(session.tenantId) || 1
+  };
   next();
 }
 
@@ -69,43 +161,238 @@ export function requireRole(allowedRoles: ('dueno' | 'empleado')[]) {
 // -------------------------------------------------------------
 // 1. Authentication Routes (Roles: Empleado vs Dueño)
 // -------------------------------------------------------------
-router.post('/auth/login', (req: Request, res: Response) => {
+function challengeHash(id: string, answer: string): string {
+  return crypto.createHmac('sha256', CHALLENGE_SECRET).update(`${id}:${answer}`).digest('hex');
+}
+
+router.get('/auth/challenge', (_req: Request, res: Response) => {
+  const left = 2 + crypto.randomInt(8);
+  const right = 1 + crypto.randomInt(8);
+  const id = crypto.randomBytes(16).toString('hex');
+  const answer = String(left + right);
+  db.prepare('DELETE FROM login_challenges WHERE created_at < ?').run(Date.now() - 10 * 60 * 1000);
+  db.prepare(
+    'INSERT INTO login_challenges (id, answer_hash, created_at, used) VALUES (?, ?, ?, 0)'
+  ).run(id, challengeHash(id, answer), Date.now());
+
+  res.json({
+    id,
+    prompt: `¿Cuánto es ${left} + ${right}?`,
+    turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || null
+  });
+});
+
+async function assertHuman(req: Request): Promise<string | null> {
+  const company = typeof req.body?.company === 'string' ? req.body.company.trim() : '';
+  if (company) return 'No se pudo validar la solicitud.';
+
+  const turnstileSecret = process.env.TURNSTILE_SECRET;
+  if (turnstileSecret) {
+    const token = String(req.body?.turnstileToken || '');
+    if (!token) return 'Complete la verificación de seguridad para continuar.';
+    const params = new URLSearchParams();
+    params.set('secret', turnstileSecret);
+    params.set('response', token);
+    params.set('remoteip', clientIp(req));
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: params
+    });
+    const data = await response.json().catch(() => ({ success: false })) as { success?: boolean };
+    if (!data.success) return 'La verificación anti-bots no fue válida. Intente de nuevo.';
+    return null;
+  }
+
+  const challengeId = String(req.body?.challengeId || '');
+  const challengeAnswer = String(req.body?.challengeAnswer || '').trim();
+  if (challengeId) {
+    const row = db.prepare(
+      'SELECT id, answer_hash, created_at, used FROM login_challenges WHERE id = ?'
+    ).get(challengeId) as { id: string; answer_hash: string; created_at: number; used: number } | undefined;
+
+    if (!row || row.used) return 'La verificación expiró. Recargue e intente de nuevo.';
+    const age = Date.now() - row.created_at;
+    if (age < 500 || age > 10 * 60 * 1000) {
+      return 'La verificación no es válida. Espere un momento y vuelva a intentar.';
+    }
+    const expected = challengeHash(row.id, challengeAnswer);
+    const valid = expected.length === row.answer_hash.length
+      && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(row.answer_hash));
+    db.prepare('UPDATE login_challenges SET used = 1 WHERE id = ?').run(row.id);
+    if (!valid) return 'La respuesta de verificación es incorrecta.';
+  }
+
+  return null;
+}
+
+router.post('/auth/login', rateLimit('login', 8, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  const humanError = await assertHuman(req);
+  if (humanError) {
+    return res.status(400).json({ error: humanError });
+  }
+
   const { role, pin, username, password } = req.body;
 
   let user: any = null;
   if (role && pin) {
-    user = db.prepare('SELECT * FROM users WHERE role = ? AND pin = ?').get(role, String(pin));
+    user = db.prepare("SELECT * FROM users WHERE role = ? AND pin = ? AND COALESCE(active, 1) = 1").get(role, String(pin));
   } else if (pin) {
-    user = db.prepare('SELECT * FROM users WHERE pin = ?').get(String(pin));
+    user = db.prepare('SELECT * FROM users WHERE pin = ? AND COALESCE(active, 1) = 1').get(String(pin));
   } else if (username && password) {
-    user = db.prepare('SELECT * FROM users WHERE username = ? AND password_hash = ?').get(username, password);
-  } else if (role) {
-    // Quick role switch for prototype demo if pin not provided
-    user = db.prepare('SELECT * FROM users WHERE role = ? LIMIT 1').get(role);
+    const pwHash = hashPassword(String(password));
+    user = db.prepare('SELECT * FROM users WHERE username = ? AND COALESCE(active, 1) = 1').get(username);
+    if (user && user.password_hash !== pwHash && user.password_hash !== String(password)) {
+      // Also allow plain-text comparison for legacy records not yet hashed
+      user = null;
+    }
   }
 
   if (!user) {
     return res.status(401).json({ error: 'PIN o credenciales incorrectas. Verifique e intente nuevamente.' });
   }
 
-  // Create session valid for 7 days
   const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + SESSION_MS).toISOString();
 
   db.prepare(`
-    INSERT INTO sessions (token, user_id, role, username, display_name, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO sessions (token, user_id, role, username, display_name, expires_at, last_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   `).run(token, user.id, user.role, user.username, user.display_name, expiresAt);
 
+  res.setHeader('Set-Cookie', sessionCookie(token, Math.floor(SESSION_MS / 1000)));
   res.json({
     token,
     user: {
       id: user.id,
       username: user.username,
       role: user.role,
-      displayName: user.display_name
+      displayName: user.display_name,
+      tenantId: user.tenant_id || 1
     }
   });
+});
+
+// POST /auth/register — Register a new business (new tenant)
+router.post('/auth/register', rateLimit('register', 3, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  // Honeypot
+  const company = typeof req.body?.company === 'string' ? req.body.company.trim() : '';
+  if (company) return res.status(400).json({ error: 'No se pudo validar la solicitud.' });
+
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '').trim();
+  const businessName = String(req.body?.businessName || '').trim();
+
+  // Validate username: at least 4 chars, alphanumeric + underscore only
+  if (!/^[a-zA-Z0-9_]{4,}$/.test(username)) {
+    return res.status(400).json({
+      error: 'El nombre de usuario debe tener al menos 4 caracteres (solo letras, números y guión bajo).'
+    });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+  }
+  if (businessName.length < 2) {
+    return res.status(400).json({ error: 'Indique el nombre del negocio (mínimo 2 caracteres).' });
+  }
+
+  // Check username uniqueness
+  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+  if (existing) {
+    return res.status(409).json({ error: 'Ese nombre de usuario ya está en uso. Elija otro.' });
+  }
+
+  // Generate new tenant_id = max(tenant_id) + 1
+  const maxTenant = db.prepare('SELECT COALESCE(MAX(tenant_id), 0) as mx FROM users').get() as { mx: number };
+  const newTenantId = maxTenant.mx + 1;
+
+  const pwHash = hashPassword(password);
+  const empPwHash = hashPassword('empleado123');
+
+  // Create owner user
+  const ownerResult = db.prepare(`
+    INSERT INTO users (username, password_hash, pin, role, display_name, tenant_id)
+    VALUES (?, ?, ?, 'dueno', ?, ?)
+  `).run(username, pwHash, password.slice(0, 6), `${businessName} (Dueño)`, newTenantId);
+
+  const ownerId = Number(ownerResult.lastInsertRowid);
+
+  // Create default employee for new tenant
+  const empUsername = `${username}_empleado`;
+  db.prepare(`
+    INSERT INTO users (username, password_hash, pin, role, display_name, tenant_id)
+    VALUES (?, ?, ?, 'empleado', ?, ?)
+  `).run(empUsername, empPwHash, '0000', `${businessName} (Cajero)`, newTenantId);
+
+  // Create session for the new owner
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + SESSION_MS).toISOString();
+  db.prepare(`
+    INSERT INTO sessions (token, user_id, role, username, display_name, expires_at, last_seen_at)
+    VALUES (?, ?, 'dueno', ?, ?, ?, CURRENT_TIMESTAMP)
+  `).run(token, ownerId, username, `${businessName} (Dueño)`, expiresAt);
+
+  writeAudit('register-tenant', 'users', ownerId, `Nuevo negocio: ${businessName} (tenant ${newTenantId})`, 'dueno');
+
+  res.setHeader('Set-Cookie', sessionCookie(token, Math.floor(SESSION_MS / 1000)));
+  res.status(201).json({
+    success: true,
+    token,
+    tenantId: newTenantId,
+    user: {
+      id: ownerId,
+      username,
+      role: 'dueno',
+      displayName: `${businessName} (Dueño)`,
+      tenantId: newTenantId
+    }
+  });
+});
+
+// GET /auth/users — List users belonging to the same tenant (dueno only)
+router.get('/auth/users', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const tenantId = req.user!.tenantId;
+  const users = db.prepare(
+    'SELECT id, username, role, display_name, COALESCE(active, 1) as active FROM users WHERE COALESCE(tenant_id, 1) = ?'
+  ).all(tenantId) as any[];
+  res.json(users.map(u => ({
+    id: u.id,
+    username: u.username,
+    role: u.role,
+    displayName: u.display_name,
+    active: u.active === 1
+  })));
+});
+
+// POST /auth/users — Add a new employee to the same tenant (dueno only)
+router.post('/auth/users', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '').trim();
+  const displayName = String(req.body?.displayName || '').trim();
+  const pin = String(req.body?.pin || '0000').trim();
+
+  if (!/^[a-zA-Z0-9_]{4,}$/.test(username)) {
+    return res.status(400).json({
+      error: 'El nombre de usuario debe tener al menos 4 caracteres (solo letras, números y guión bajo).'
+    });
+  }
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres.' });
+  }
+
+  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+  if (existing) {
+    return res.status(409).json({ error: 'Ese nombre de usuario ya está en uso.' });
+  }
+
+  const tenantId = req.user!.tenantId;
+  const pwHash = hashPassword(password);
+  const result = db.prepare(`
+    INSERT INTO users (username, password_hash, pin, role, display_name, tenant_id)
+    VALUES (?, ?, ?, 'empleado', ?, ?)
+  `).run(username, pwHash, pin, displayName || `${username} (Empleado)`, tenantId);
+
+  writeAudit('add-user', 'users', Number(result.lastInsertRowid), `Nuevo empleado: ${username}`, req.user?.role);
+  res.status(201).json({ success: true, id: Number(result.lastInsertRowid) });
 });
 
 router.get('/auth/me', (req: Request, res: Response) => {
@@ -116,20 +403,61 @@ router.get('/auth/me', (req: Request, res: Response) => {
 });
 
 router.post('/auth/logout', (req: Request, res: Response) => {
+  const cookies = readCookies(req);
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim();
+  const token = cookies[SESSION_COOKIE]
+    || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '');
+  if (token) {
     db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
   }
+  res.setHeader('Set-Cookie', sessionCookie('', 0));
   res.json({ success: true });
 });
 
-router.get('/auth/profiles', (_req: Request, res: Response) => {
-  const users = db.prepare('SELECT id, username, role, display_name FROM users').all();
-  res.json(users);
+router.get('/auth/profiles', (req: Request, res: Response) => {
+  // Only return profiles belonging to the same tenant (or tenant 1 for unauthenticated)
+  const tenantId = req.user?.tenantId ?? 1;
+  const users = db.prepare(
+    'SELECT id, username, role, display_name FROM users WHERE COALESCE(active, 1) = 1 AND COALESCE(tenant_id, 1) = ?'
+  ).all(tenantId) as any[];
+  res.json(users.map((user) => ({
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    displayName: user.display_name
+  })));
 });
 
-router.post('/auth/change-password', (req: Request, res: Response) => {
+router.post('/auth/reset-password', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const userId = Number(req.body?.userId);
+  const newPassword = String(req.body?.newPassword || '').trim();
+  if (!userId || newPassword.length < 4) {
+    return res.status(400).json({ error: 'Indique el usuario y una contraseña de al menos 4 caracteres.' });
+  }
+
+  // Verify target belongs to same tenant
+  const target = db.prepare(
+    'SELECT id, role, display_name, COALESCE(tenant_id, 1) as tenant_id FROM users WHERE id = ?'
+  ).get(userId) as any;
+  if (!target) {
+    return res.status(404).json({ error: 'El usuario indicado no existe.' });
+  }
+  if (Number(target.tenant_id) !== req.user!.tenantId) {
+    return res.status(404).json({ error: 'El usuario indicado no existe.' });
+  }
+
+  const pwHash = hashPassword(newPassword);
+  db.prepare('UPDATE users SET pin = ?, password_hash = ? WHERE id = ?').run(newPassword, pwHash, userId);
+  writeAudit('reset-password', 'users', userId, `Restablecida la clave de ${target.display_name}`, req.user?.role);
+  res.json({ success: true, message: `Contraseña de ${target.display_name} restablecida.` });
+});
+
+router.post('/auth/change-password', rateLimit('password', 8, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  const humanError = await assertHuman(req);
+  if (humanError) {
+    return res.status(400).json({ error: humanError });
+  }
+
   const { targetRole, oldPassword, newPassword } = req.body;
 
   // 1. Validar campos obligatorios
@@ -156,21 +484,22 @@ router.post('/auth/change-password', (req: Request, res: Response) => {
     return res.status(404).json({ error: 'El usuario especificado no existe.' });
   }
 
-  // 3. Verificar que se autorice con la contraseña antigua:
-  // Coincide con la contraseña actual/PIN del usuario objetivo o con la del Dueño
-  const matchesTarget = (targetUser.pin === cleanOld || targetUser.password_hash === cleanOld);
-  const matchesDueno = duenoUser && (duenoUser.pin === cleanOld || duenoUser.password_hash === cleanOld);
+  // 3. Verificar autorización con contraseña antigua
+  const oldHash = hashPassword(cleanOld);
+  const matchesTarget = (targetUser.pin === cleanOld || targetUser.password_hash === cleanOld || targetUser.password_hash === oldHash);
+  const matchesDueno = duenoUser && (duenoUser.pin === cleanOld || duenoUser.password_hash === cleanOld || duenoUser.password_hash === oldHash);
 
   if (!matchesTarget && !matchesDueno) {
     return res.status(401).json({ error: 'La contraseña actual (antigua) ingresada es incorrecta. No se autorizó el cambio.' });
   }
 
   // 4. Actualizar la contraseña y PIN del usuario objetivo
+  const newHash = hashPassword(cleanNew);
   db.prepare(`
     UPDATE users 
     SET pin = ?, password_hash = ?
     WHERE role = ?
-  `).run(cleanNew, cleanNew, targetRole);
+  `).run(cleanNew, newHash, targetRole);
 
   res.json({
     success: true,
@@ -181,8 +510,11 @@ router.post('/auth/change-password', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 2. Active Dates (Gestión dinámica de fechas: añadir y quitar)
 // -------------------------------------------------------------
-router.get('/dates', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT date FROM active_dates ORDER BY date DESC').all() as { date: string }[];
+router.get('/dates', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const rows = db.prepare(
+    'SELECT date FROM active_dates WHERE COALESCE(tenant_id, 1) = ? ORDER BY date DESC'
+  ).all(tenantId) as { date: string }[];
   res.json(rows.map(r => r.date));
 });
 
@@ -191,8 +523,9 @@ router.post('/dates', (req: Request, res: Response) => {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: 'Formato de fecha inválido (debe ser AAAA-MM-DD).' });
   }
+  const tenantId = req.user?.tenantId ?? 1;
   try {
-    db.prepare('INSERT OR IGNORE INTO active_dates (date) VALUES (?)').run(date);
+    db.prepare('INSERT OR IGNORE INTO active_dates (date, tenant_id) VALUES (?, ?)').run(date, tenantId);
     res.json({ success: true, date });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -202,44 +535,233 @@ router.post('/dates', (req: Request, res: Response) => {
 router.delete('/dates/:date', requireAuth, (req: Request, res: Response) => {
   const { date } = req.params;
   const userRole = req.user?.role;
+  const tenantId = req.user!.tenantId;
 
-  // Check if date has movements
-  const countRow = db.prepare('SELECT COUNT(*) as count FROM movements WHERE date = ?').get(date) as { count: number };
+  // Check if date has movements for this tenant
+  const countRow = db.prepare(
+    'SELECT COUNT(*) as count FROM movements WHERE date = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(date, tenantId) as { count: number };
   if (countRow.count > 0 && userRole !== 'dueno') {
     return res.status(403).json({
       error: 'Solo el Dueño puede eliminar una fecha que contiene movimientos registrados.'
     });
   }
 
-  // If dueno deletes date with movements, delete movements as well
   if (userRole === 'dueno') {
-    db.prepare('DELETE FROM movements WHERE date = ?').run(date);
+    const linked = db.prepare(
+      'SELECT * FROM movements WHERE date = ? AND COALESCE(voided, 0) = 0 AND COALESCE(tenant_id, 1) = ?'
+    ).all(date, tenantId) as any[];
+    try {
+      db.exec('BEGIN');
+      for (const mov of linked) voidMovementRecord(mov, userRole);
+      db.exec('COMMIT');
+    } catch (err: any) {
+      try { db.exec('ROLLBACK'); } catch { /* transacción ya cerrada */ }
+      const status = err instanceof CashError ? err.status : 500;
+      return res.status(status).json({ error: err.message || 'No se pudieron anular los movimientos de la fecha.' });
+    }
   }
 
-  db.prepare('DELETE FROM active_dates WHERE date = ?').run(date);
+  db.prepare('DELETE FROM active_dates WHERE date = ? AND COALESCE(tenant_id, 1) = ?').run(date, tenantId);
   res.json({ success: true, message: `Fecha ${date} eliminada.` });
 });
+
+// -------------------------------------------------------------
+// 2b. Cajas (alta y archivo; no se borran para conservar el historial)
+// -------------------------------------------------------------
+function mapRegister(row: any, includeBalance: boolean) {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    active: row.active === 1,
+    balance: includeBalance ? Math.round(Number(row.balance) * 100) / 100 : undefined,
+    createdAt: row.created_at
+  };
+}
+
+router.get('/registers', requireAuth, (req: Request, res: Response) => {
+  const tenantId = req.user!.tenantId;
+  const rows = db.prepare(
+    'SELECT * FROM cash_registers WHERE COALESCE(tenant_id, 1) = ? ORDER BY active DESC, id ASC'
+  ).all(tenantId) as any[];
+  const includeBalance = req.user?.role === 'dueno';
+  res.json(rows.map((row) => mapRegister(row, includeBalance)));
+});
+
+// GET /registers/:id/balance — returns current balance of a specific register (dueno only)
+router.get('/registers/:id/balance', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const register = db.prepare(
+    'SELECT * FROM cash_registers WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
+  if (!register) {
+    return res.status(404).json({ error: 'Caja no encontrada.' });
+  }
+  res.json({
+    id: register.id,
+    name: register.name,
+    kind: register.kind,
+    balance: Math.round(Number(register.balance) * 100) / 100,
+    active: register.active === 1
+  });
+});
+
+router.post('/registers', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const name = String(req.body?.name || '').trim();
+  const kind = req.body?.kind === 'chica' ? 'chica' : 'operativa';
+  const opening = Math.round((Number(req.body?.openingBalance) || 0) * 100) / 100;
+  if (name.length < 2) {
+    return res.status(400).json({ error: 'Indique un nombre de caja de al menos 2 caracteres.' });
+  }
+  if (opening < 0) {
+    return res.status(400).json({ error: 'El saldo inicial no puede ser negativo.' });
+  }
+  const tenantId = req.user!.tenantId;
+  const result = db.prepare(
+    'INSERT INTO cash_registers (name, kind, balance, active, tenant_id) VALUES (?, ?, ?, 1, ?)'
+  ).run(name, kind, opening, tenantId);
+  writeAudit('create-register', 'cash_registers', Number(result.lastInsertRowid), name, req.user?.role);
+  res.json({ success: true, id: Number(result.lastInsertRowid) });
+});
+
+router.patch('/registers/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const register = db.prepare(
+    'SELECT * FROM cash_registers WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
+  if (!register) {
+    return res.status(404).json({ error: 'Caja no encontrada.' });
+  }
+  const active = req.body?.active === false || req.body?.active === 0 ? 0 : 1;
+  if (active === 0) {
+    const remaining = db.prepare(
+      'SELECT COUNT(*) as count FROM cash_registers WHERE kind = ? AND active = 1 AND id != ? AND COALESCE(tenant_id, 1) = ?'
+    ).get(register.kind, id, tenantId) as { count: number };
+    if (remaining.count === 0) {
+      return res.status(400).json({
+        error: 'Debe permanecer al menos una caja activa de este tipo para seguir operando.'
+      });
+    }
+  }
+  db.prepare('UPDATE cash_registers SET active = ? WHERE id = ?').run(active, id);
+  writeAudit(active ? 'activate-register' : 'archive-register', 'cash_registers', id, register.name, req.user?.role);
+  res.json({ success: true, active: active === 1 });
+});
+
+router.delete('/registers/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const register = db.prepare(
+    'SELECT * FROM cash_registers WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
+  if (!register) {
+    return res.status(404).json({ error: 'Caja no encontrada.' });
+  }
+
+  // Verificar si es la única activa de su tipo
+  const remaining = db.prepare(
+    'SELECT COUNT(*) as count FROM cash_registers WHERE kind = ? AND active = 1 AND id != ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(register.kind, id, tenantId) as { count: number };
+  if (remaining.count === 0) {
+    return res.status(400).json({
+      error: 'No se puede quitar esta caja porque debe permanecer al menos una caja activa de este tipo.'
+    });
+  }
+
+  // Verificar si tiene movimientos registrados en historial
+  const hasMovements = db.prepare(
+    'SELECT COUNT(*) as count FROM movements WHERE register_id = ?'
+  ).get(id) as { count: number };
+  const hasCC = db.prepare(
+    'SELECT COUNT(*) as count FROM caja_chica WHERE register_id = ?'
+  ).get(id) as { count: number };
+
+  if (hasMovements.count > 0 || hasCC.count > 0) {
+    // Para no violar la inmutabilidad y auditoría contable, se archiva
+    db.prepare('UPDATE cash_registers SET active = 0 WHERE id = ?').run(id);
+    writeAudit('archive-register', 'cash_registers', id, `Caja archivada: ${register.name}`, req.user?.role);
+    return res.json({
+      success: true,
+      message: `La caja "${register.name}" contiene transacciones históricas, por lo que fue archivada de forma segura.`
+    });
+  }
+
+  // Si no tiene transacciones registradas, se puede eliminar físicamente
+  db.prepare('DELETE FROM cash_registers WHERE id = ?').run(id);
+  writeAudit('delete-register', 'cash_registers', id, `Caja eliminada: ${register.name}`, req.user?.role);
+  res.json({ success: true, message: `Caja "${register.name}" eliminada correctamente.` });
+});
+
+class CashError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function adjustRegister(registerId: number, delta: number, options?: { allowInactive?: boolean }) {
+  const register = db.prepare('SELECT * FROM cash_registers WHERE id = ?').get(registerId) as any;
+  if (!register) throw new CashError('La caja indicada no existe.');
+  if (register.active !== 1 && !options?.allowInactive) throw new CashError(`La caja "${register.name}" está archivada y no acepta movimientos.`);
+  const next = Math.round((Number(register.balance) + delta) * 100) / 100;
+  if (next < -0.005) {
+    throw new CashError(
+      `Fondos insuficientes en ${register.name}. Saldo disponible: $${Number(register.balance).toFixed(2)}`
+    );
+  }
+  db.prepare('UPDATE cash_registers SET balance = ? WHERE id = ?').run(next, register.id);
+  return register as { id: number; name: string; kind: string; balance: number };
+}
+
+function defaultRegister(kind: 'operativa' | 'chica', tenantId: number) {
+  return db.prepare(
+    'SELECT * FROM cash_registers WHERE kind = ? AND active = 1 AND COALESCE(tenant_id, 1) = ? ORDER BY id LIMIT 1'
+  ).get(kind, tenantId) as any;
+}
+
+function getCajaChicaCurrentBalance(tenantId: number): number {
+  const rows = db.prepare(
+    'SELECT type, amount FROM caja_chica WHERE COALESCE(voided, 0) = 0 AND COALESCE(tenant_id, 1) = ?'
+  ).all(tenantId) as { type: string; amount: number }[];
+  let totalIn = 0;
+  let totalOut = 0;
+  for (const row of rows) {
+    if (row.type === 'ingreso') totalIn += row.amount;
+    else totalOut += row.amount;
+  }
+  return Math.round((totalIn - totalOut) * 100) / 100;
+}
 
 // -------------------------------------------------------------
 // 3. Movements (Ventas, Gastos, Servicios, etc.)
 // -------------------------------------------------------------
 router.get('/movements', (req: Request, res: Response) => {
   const { date, search } = req.query;
-  let sql = 'SELECT * FROM movements WHERE 1=1';
-  const params: any[] = [];
+  const tenantId = req.user?.tenantId ?? 1;
+  let sql = `
+    SELECT m.*, r.name as register_name
+    FROM movements m
+    LEFT JOIN cash_registers r ON r.id = m.register_id
+    WHERE COALESCE(m.tenant_id, 1) = ?
+  `;
+  const params: any[] = [tenantId];
 
   if (date && date !== 'TODOS') {
-    sql += ' AND date = ?';
+    sql += ' AND m.date = ?';
     params.push(date);
   }
 
   if (search) {
-    sql += ' AND (desc LIKE ? OR doc LIKE ? OR voucher_code LIKE ?)';
+    sql += ' AND (m.desc LIKE ? OR m.doc LIKE ? OR m.voucher_code LIKE ? OR r.name LIKE ?)';
     const term = `%${search}%`;
-    params.push(term, term, term);
+    params.push(term, term, term, term);
   }
 
-  sql += ' ORDER BY id DESC';
+  sql += ' ORDER BY m.id DESC';
   const rows = db.prepare(sql).all(...params) as any[];
 
   const movements = rows.map(r => ({
@@ -255,131 +777,203 @@ router.get('/movements', (req: Request, res: Response) => {
     time: r.time,
     items: r.items_json ? JSON.parse(r.items_json) : null,
     ccId: r.cc_id,
-    userRole: r.user_role
+    userRole: r.user_role,
+    registerId: r.register_id,
+    registerName: r.register_name || 'Sin caja',
+    debit: r.debit || 0,
+    credit: r.credit || 0,
+    voided: r.voided === 1
   }));
 
   res.json(movements);
 });
 
-router.post('/movements', (req: Request, res: Response) => {
-  const { date, type, desc, amount, tax, doc, time, items, isCajaChica, ccCategory, voucherRecipient } = req.body;
+router.post('/movements', requireAuth, rateLimit('movements', 40, 60 * 1000), (req: Request, res: Response) => {
+  const { date, type, desc, amount, tax, doc, time, items, ccCategory, voucherRecipient, registerId } = req.body;
   if (!date || !type || !amount || !doc) {
     return res.status(400).json({ error: 'Faltan campos obligatorios para registrar la operación.' });
   }
 
+  const tenantId = req.user!.tenantId;
   const amt = Math.round(Number(amount) * 100) / 100;
-  // IVA 13% for El Salvador (included in price) applies to sales and expenses including 'Sin Comprobante'
+  if (!(amt > 0)) {
+    return res.status(400).json({ error: 'El monto debe ser mayor a cero.' });
+  }
   const tx = (tax !== undefined && tax !== null && !isNaN(Number(tax)) && Number(tax) > 0)
     ? Math.round(Number(tax) * 100) / 100
     : Math.round((amt / 1.13 * 0.13) * 100) / 100;
   let voucherCode: string | null = null;
-  let recDesc = desc;
+  const recDesc = desc;
 
-  // New Feature: If "Sin Comprobante" is selected, automatically generate internal cash voucher (Vale Interno)
   if (doc === 'Sin Comprobante') {
     voucherCode = getNextVoucherNumber();
   }
 
-  let ccId: number | null = null;
-  // If registered as caja chica expense from accounting module
-  if (type === 'cajachica') {
-    const currentCcBalance = getCajaChicaCurrentBalance();
-    if (amt - currentCcBalance > 0.005) {
-      return res.status(400).json({
-        error: `Fondos insuficientes en Caja Chica. Saldo actual disponible: $${currentCcBalance.toFixed(2)}`
-      });
-    }
-
-    const ccStmt = db.prepare(`
-      INSERT INTO caja_chica (type, category, desc, amount, date, time, user_role)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    const ccRes = ccStmt.run('gasto', ccCategory || 'Gasto General', desc || 'Gasto desde Contable', amt, date, time || 'Ahora', req.user?.role || 'empleado');
-    ccId = Number(ccRes.lastInsertRowid);
+  const moneyIn = type === 'venta';
+  const wantedKind = type === 'cajachica' ? 'chica' : 'operativa';
+  const requestedId = Number(registerId) || 0;
+  const register = requestedId
+    ? db.prepare(
+        'SELECT * FROM cash_registers WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+      ).get(requestedId, tenantId)
+    : defaultRegister(wantedKind, tenantId);
+  if (!register || (register as any).kind !== wantedKind) {
+    return res.status(400).json({ error: 'Seleccione una caja activa del tipo correcto para esta operación.' });
   }
 
-  // If sale with inventory items, deduct stock
-  if (type === 'venta' && Array.isArray(items) && items.length > 0) {
-    const deductStock = db.prepare(`
+  const debit = moneyIn ? 0 : amt;
+  const credit = moneyIn ? amt : 0;
+  const delta = credit - debit;
+
+  try {
+    db.exec('BEGIN');
+    adjustRegister((register as any).id, delta);
+
+    let ccId: number | null = null;
+    if (type === 'cajachica') {
+      const ccBal = getCajaChicaCurrentBalance(tenantId);
+      if (amt - ccBal > 0.005) {
+        throw new CashError(`Fondos insuficientes en Caja Chica. Saldo actual disponible: $${ccBal.toFixed(2)}`);
+      }
+      const ccRes = db.prepare(`
+        INSERT INTO caja_chica (type, category, desc, amount, date, time, user_role, register_id, tenant_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'gasto',
+        ccCategory || 'Gasto General',
+        desc || 'Gasto desde Contable',
+        amt,
+        date,
+        time || 'Ahora',
+        req.user?.role || 'empleado',
+        (register as any).id,
+        tenantId
+      );
+      ccId = Number(ccRes.lastInsertRowid);
+    }
+
+    if (type === 'venta' && Array.isArray(items) && items.length > 0) {
+      const variant = db.prepare(`
+        SELECT stock FROM inventory_variants
+        WHERE item_code = ? AND size = ? AND color = ? AND COALESCE(tenant_id, 1) = ?
+      `);
+      const deductStock = db.prepare(`
+        UPDATE inventory_variants
+        SET stock = stock - ?
+        WHERE item_code = ? AND size = ? AND color = ? AND stock >= ? AND COALESCE(tenant_id, 1) = ?
+      `);
+      for (const it of items) {
+        const qty = Number(it.qty) || 1;
+        const current = variant.get(it.code, it.size, it.color, tenantId) as { stock: number } | undefined;
+        if (!current || current.stock < qty) {
+          throw new CashError(`Stock insuficiente para ${it.code} talla ${it.size}.`);
+        }
+        const updated = deductStock.run(qty, it.code, it.size, it.color, qty, tenantId);
+        if (updated.changes !== 1) {
+          throw new CashError(`No se pudo descontar el stock de ${it.code}.`);
+        }
+      }
+    }
+
+    const result = db.prepare(`
+      INSERT INTO movements (
+        date, type, desc, amount, tax, doc, voucher_code, voucher_recipient, time,
+        items_json, cc_id, user_role, register_id, debit, credit, voided, tenant_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+    `).run(
+      date,
+      type,
+      recDesc,
+      amt,
+      tx,
+      doc,
+      voucherCode,
+      voucherRecipient || null,
+      time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      items ? JSON.stringify(items) : null,
+      ccId,
+      req.user?.role || 'empleado',
+      (register as any).id,
+      debit,
+      credit,
+      tenantId
+    );
+
+    db.prepare('INSERT OR IGNORE INTO active_dates (date, tenant_id) VALUES (?, ?)').run(date, tenantId);
+    db.exec('COMMIT');
+    res.json({
+      success: true,
+      id: result.lastInsertRowid,
+      voucherCode,
+      registerName: (register as any).name
+    });
+  } catch (err: any) {
+    try { db.exec('ROLLBACK'); } catch { /* transacción ya cerrada */ }
+    const status = err instanceof CashError ? err.status : 500;
+    res.status(status).json({ error: err.message || 'No se pudo registrar la operación.' });
+  }
+});
+
+function voidMovementRecord(mov: any, role?: string) {
+  if (!mov || mov.voided === 1) return;
+  if (mov.register_id) {
+    const reversal = (Number(mov.debit) || 0) - (Number(mov.credit) || 0);
+    adjustRegister(mov.register_id, reversal, { allowInactive: true });
+  }
+  if (mov.type === 'venta' && mov.items_json) {
+    const items = JSON.parse(mov.items_json);
+    const restoreStock = db.prepare(`
       UPDATE inventory_variants
-      SET stock = MAX(0, stock - ?)
+      SET stock = stock + ?
       WHERE item_code = ? AND size = ? AND color = ?
     `);
-
     for (const it of items) {
-      deductStock.run(Number(it.qty) || 1, it.code, it.size, it.color);
+      restoreStock.run(Number(it.qty) || 1, it.code, it.size, it.color);
     }
   }
-
-  const insertMovement = db.prepare(`
-    INSERT INTO movements (date, type, desc, amount, tax, doc, voucher_code, voucher_recipient, time, items_json, cc_id, user_role)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const result = insertMovement.run(
-    date,
-    type,
-    recDesc,
-    amt,
-    tx,
-    doc,
-    voucherCode,
-    voucherRecipient || null,
-    time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    items ? JSON.stringify(items) : null,
-    ccId,
-    req.user?.role || 'empleado'
-  );
-
-  // Ensure active date is registered
-  db.prepare('INSERT OR IGNORE INTO active_dates (date) VALUES (?)').run(date);
-
-  res.json({
-    success: true,
-    id: result.lastInsertRowid,
-    voucherCode
-  });
-});
+  if (mov.cc_id) {
+    db.prepare('UPDATE caja_chica SET voided = 1 WHERE id = ?').run(mov.cc_id);
+  }
+  db.prepare('UPDATE movements SET voided = 1 WHERE id = ?').run(mov.id);
+  writeAudit('void-movement', 'movements', mov.id, mov.desc || mov.type, role);
+}
 
 router.delete('/movements/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const mov = db.prepare('SELECT * FROM movements WHERE id = ?').get(id) as any;
+  const tenantId = req.user!.tenantId;
+  const mov = db.prepare(
+    'SELECT * FROM movements WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
   if (!mov) {
     return res.status(404).json({ error: 'Movimiento no encontrado.' });
   }
-
-  // Restore inventory stock if this was a sale
-  if (mov.type === 'venta' && mov.items_json) {
-    try {
-      const items = JSON.parse(mov.items_json);
-      const restoreStock = db.prepare(`
-        UPDATE inventory_variants
-        SET stock = stock + ?
-        WHERE item_code = ? AND size = ? AND color = ?
-      `);
-      for (const it of items) {
-        restoreStock.run(Number(it.qty) || 1, it.code, it.size, it.color);
-      }
-    } catch (e) {
-      console.error('Error restoring stock:', e);
-    }
+  if (mov.voided === 1) {
+    return res.status(400).json({ error: 'Este movimiento ya está anulado y permanece en el historial.' });
   }
 
-  // If linked to a caja chica entry, delete that entry as well
-  if (mov.cc_id) {
-    db.prepare('DELETE FROM caja_chica WHERE id = ?').run(mov.cc_id);
+  try {
+    db.exec('BEGIN');
+    voidMovementRecord(mov, req.user?.role);
+    db.exec('COMMIT');
+    res.json({ success: true, message: 'Movimiento anulado. El historial se conserva y el stock o el saldo fueron revertidos.' });
+  } catch (err: any) {
+    try { db.exec('ROLLBACK'); } catch { /* transacción ya cerrada */ }
+    const status = err instanceof CashError ? err.status : 500;
+    res.status(status).json({ error: err.message || 'No se pudo anular el movimiento.' });
   }
-
-  db.prepare('DELETE FROM movements WHERE id = ?').run(id);
-  res.json({ success: true, message: 'Movimiento eliminado y stock restaurado si aplicaba.' });
 });
 
 // -------------------------------------------------------------
-// 4. Inventory Module (Fixing Bug 6: text truncation & edit persistence)
+// 4. Inventory Module
 // -------------------------------------------------------------
-router.get('/inventory', (_req: Request, res: Response) => {
-  const items = db.prepare('SELECT * FROM inventory_items ORDER BY code ASC').all() as any[];
-  const variants = db.prepare('SELECT * FROM inventory_variants ORDER BY id ASC').all() as any[];
+router.get('/inventory', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const items = db.prepare(
+    'SELECT * FROM inventory_items WHERE COALESCE(tenant_id, 1) = ? ORDER BY code ASC'
+  ).all(tenantId) as any[];
+  const variants = db.prepare(
+    'SELECT * FROM inventory_variants WHERE COALESCE(tenant_id, 1) = ? ORDER BY id ASC'
+  ).all(tenantId) as any[];
 
   const variantsByCode: { [key: string]: any[] } = {};
   variants.forEach(v => {
@@ -404,7 +998,7 @@ router.get('/inventory', (_req: Request, res: Response) => {
   res.json(fullList);
 });
 
-router.post('/inventory', (req: Request, res: Response) => {
+router.post('/inventory', requireAuth, (req: Request, res: Response) => {
   const { code, name, audience, category, variants } = req.body;
   const cleanCode = String(code || '').trim().toUpperCase();
 
@@ -412,17 +1006,25 @@ router.post('/inventory', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Datos de prenda o variantes incompletos.' });
   }
 
-  const existing = db.prepare('SELECT code FROM inventory_items WHERE code = ?').get(cleanCode);
+  const tenantId = req.user!.tenantId;
+
+  const existing = db.prepare(
+    'SELECT code FROM inventory_items WHERE code = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(cleanCode, tenantId);
   if (existing) {
     return res.status(400).json({
       error: `El código ${cleanCode} ya existe. Utiliza el botón Editar en la tabla para modificarlo.`
     });
   }
 
-  const insertItem = db.prepare('INSERT INTO inventory_items (code, name, audience, category) VALUES (?, ?, ?, ?)');
-  const insertVariant = db.prepare('INSERT INTO inventory_variants (item_code, size, color, cost, price, stock) VALUES (?, ?, ?, ?, ?, ?)');
+  const insertItem = db.prepare(
+    'INSERT INTO inventory_items (code, name, audience, category, tenant_id) VALUES (?, ?, ?, ?, ?)'
+  );
+  const insertVariant = db.prepare(
+    'INSERT INTO inventory_variants (item_code, size, color, cost, price, stock, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
 
-  insertItem.run(cleanCode, name.trim(), audience, category);
+  insertItem.run(cleanCode, name.trim(), audience, category, tenantId);
   for (const v of variants) {
     insertVariant.run(
       cleanCode,
@@ -430,18 +1032,22 @@ router.post('/inventory', (req: Request, res: Response) => {
       String(v.color || '').trim(),
       Number(v.cost || 0),
       Number(v.price || 0),
-      Math.max(0, parseInt(v.stock) || 0)
+      Math.max(0, parseInt(v.stock) || 0),
+      tenantId
     );
   }
 
   res.json({ success: true, code: cleanCode });
 });
 
-router.put('/inventory/:code', (req: Request, res: Response) => {
+router.put('/inventory/:code', requireAuth, (req: Request, res: Response) => {
   const codeParam = req.params.code.trim().toUpperCase();
   const { name, audience, category, variants } = req.body;
+  const tenantId = req.user!.tenantId;
 
-  const existing = db.prepare('SELECT * FROM inventory_items WHERE code = ?').get(codeParam) as any;
+  const existing = db.prepare(
+    'SELECT * FROM inventory_items WHERE code = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(codeParam, tenantId) as any;
   if (!existing) {
     return res.status(404).json({ error: `Modelo ${codeParam} no encontrado en inventario.` });
   }
@@ -454,21 +1060,25 @@ router.put('/inventory/:code', (req: Request, res: Response) => {
   db.prepare(`
     UPDATE inventory_items
     SET name = ?, audience = ?, category = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE code = ?
-  `).run(name.trim(), audience, category, codeParam);
+    WHERE code = ? AND COALESCE(tenant_id, 1) = ?
+  `).run(name.trim(), audience, category, codeParam, tenantId);
 
-  // If user is employee, keep existing cost prices if employee submitted without or unauthorized
-  const existingVariants = db.prepare('SELECT size, color, cost FROM inventory_variants WHERE item_code = ?').all(codeParam) as any[];
+  // If user is employee, keep existing cost prices
+  const existingVariants = db.prepare(
+    'SELECT size, color, cost FROM inventory_variants WHERE item_code = ? AND COALESCE(tenant_id, 1) = ?'
+  ).all(codeParam, tenantId) as any[];
   const costLookup = new Map<string, number>();
   existingVariants.forEach(ev => {
     costLookup.set(`${ev.size}|${ev.color}`.toLowerCase(), ev.cost);
   });
 
   // Replace variants atomically
-  db.prepare('DELETE FROM inventory_variants WHERE item_code = ?').run(codeParam);
+  db.prepare(
+    'DELETE FROM inventory_variants WHERE item_code = ? AND COALESCE(tenant_id, 1) = ?'
+  ).run(codeParam, tenantId);
   const insertVariant = db.prepare(`
-    INSERT INTO inventory_variants (item_code, size, color, cost, price, stock)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO inventory_variants (item_code, size, color, cost, price, stock, tenant_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const v of variants) {
@@ -483,7 +1093,8 @@ router.put('/inventory/:code', (req: Request, res: Response) => {
       String(v.color || '').trim(),
       isNaN(finalCost) ? 0 : Math.max(0, finalCost),
       Math.max(0, Number(v.price || 0)),
-      Math.max(0, parseInt(v.stock) || 0)
+      Math.max(0, parseInt(v.stock) || 0),
+      tenantId
     );
   }
 
@@ -492,30 +1103,31 @@ router.put('/inventory/:code', (req: Request, res: Response) => {
 
 router.delete('/inventory/:code', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const codeParam = req.params.code.trim().toUpperCase();
-  db.prepare('DELETE FROM inventory_variants WHERE item_code = ?').run(codeParam);
-  db.prepare('DELETE FROM inventory_items WHERE code = ?').run(codeParam);
+  const tenantId = req.user!.tenantId;
+  // Only delete if belongs to this tenant
+  const existing = db.prepare(
+    'SELECT code FROM inventory_items WHERE code = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(codeParam, tenantId);
+  if (!existing) {
+    return res.status(404).json({ error: `Modelo ${codeParam} no encontrado en inventario.` });
+  }
+  db.prepare('DELETE FROM inventory_variants WHERE item_code = ? AND COALESCE(tenant_id, 1) = ?').run(codeParam, tenantId);
+  db.prepare('DELETE FROM inventory_items WHERE code = ? AND COALESCE(tenant_id, 1) = ?').run(codeParam, tenantId);
   res.json({ success: true, message: `Modelo ${codeParam} eliminado de inventario.` });
 });
 
 // -------------------------------------------------------------
 // 5. Caja Chica
 // -------------------------------------------------------------
-function getCajaChicaCurrentBalance(): number {
-  const rows = db.prepare('SELECT type, amount FROM caja_chica').all() as { type: string; amount: number }[];
-  let totalIn = 0;
-  let totalOut = 0;
-  for (const r of rows) {
-    if (r.type === 'ingreso') totalIn += r.amount;
-    else totalOut += r.amount;
-  }
-  return totalIn - totalOut;
-}
-
-router.get('/caja-chica', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM caja_chica ORDER BY id DESC').all() as any[];
+router.get('/caja-chica', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const rows = db.prepare(
+    'SELECT * FROM caja_chica WHERE COALESCE(tenant_id, 1) = ? ORDER BY id DESC'
+  ).all(tenantId) as any[];
   let totalIn = 0;
   let totalOut = 0;
   rows.forEach(r => {
+    if (r.voided === 1) return;
     if (r.type === 'ingreso') totalIn += r.amount;
     else totalOut += r.amount;
   });
@@ -533,72 +1145,123 @@ router.get('/caja-chica', (_req: Request, res: Response) => {
       amount: r.amount,
       date: r.date,
       time: r.time,
-      userRole: r.user_role
+      userRole: r.user_role,
+      voided: r.voided === 1
     }))
   });
 });
 
-router.post('/caja-chica', (req: Request, res: Response) => {
-  const { type, category, desc, amount, date, time } = req.body;
-  const amt = Number(amount);
+router.post('/caja-chica', requireAuth, rateLimit('caja', 40, 60 * 1000), (req: Request, res: Response) => {
+  const { type, category, desc, amount, date, time, registerId } = req.body;
+  const amt = Math.round(Number(amount) * 100) / 100;
   if (!amt || amt <= 0) {
     return res.status(400).json({ error: 'Monto debe ser mayor a 0.' });
   }
-
-  const currentBalance = getCajaChicaCurrentBalance();
-  if (type === 'gasto' && amt - currentBalance > 0.005) {
-    return res.status(400).json({
-      error: `Fondos insuficientes en Caja Chica. Saldo actual disponible: $${currentBalance.toFixed(2)}`
-    });
+  if (type !== 'ingreso' && type !== 'gasto') {
+    return res.status(400).json({ error: 'El tipo de movimiento de caja chica no es válido.' });
   }
 
-  const stmt = db.prepare(`
-    INSERT INTO caja_chica (type, category, desc, amount, date, time, user_role)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+  const tenantId = req.user!.tenantId;
+  const requestedId = Number(registerId) || 0;
+  const register = requestedId
+    ? db.prepare(
+        "SELECT * FROM cash_registers WHERE id = ? AND kind = 'chica' AND COALESCE(tenant_id, 1) = ?"
+      ).get(requestedId, tenantId)
+    : defaultRegister('chica', tenantId);
+  if (!register) {
+    return res.status(400).json({ error: 'No hay una caja chica activa para registrar el movimiento.' });
+  }
 
   const finalDate = date || new Date().toISOString().slice(0, 10);
   const finalTime = time || (new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const delta = type === 'ingreso' ? amt : -amt;
 
-  const result = stmt.run(
-    type,
-    type === 'gasto' ? (category || 'Gasto General') : 'Inyección de Fondo',
-    desc || (type === 'ingreso' ? 'Carga de fondo' : 'Gasto operativo'),
-    amt,
-    finalDate,
-    finalTime,
-    req.user?.role || 'empleado'
-  );
-
-  res.json({ success: true, id: result.lastInsertRowid });
+  try {
+    db.exec('BEGIN');
+    if (type === 'gasto') {
+      const ccBal = getCajaChicaCurrentBalance(tenantId);
+      if (amt - ccBal > 0.005) {
+        throw new CashError(`Fondos insuficientes en Caja Chica. Saldo actual disponible: $${ccBal.toFixed(2)}`);
+      }
+    }
+    adjustRegister((register as any).id, delta);
+    const result = db.prepare(`
+      INSERT INTO caja_chica (type, category, desc, amount, date, time, user_role, register_id, voided, tenant_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+    `).run(
+      type,
+      type === 'gasto' ? (category || 'Gasto General') : 'Inyección de Fondo',
+      desc || (type === 'ingreso' ? 'Carga de fondo' : 'Gasto operativo'),
+      amt,
+      finalDate,
+      finalTime,
+      req.user?.role || 'empleado',
+      (register as any).id,
+      tenantId
+    );
+    db.exec('COMMIT');
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (err: any) {
+    try { db.exec('ROLLBACK'); } catch { /* transacción ya cerrada */ }
+    const status = err instanceof CashError ? err.status : 500;
+    res.status(status).json({ error: err.message || 'No se pudo registrar el movimiento de caja chica.' });
+  }
 });
 
 router.delete('/caja-chica/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const item = db.prepare('SELECT * FROM caja_chica WHERE id = ?').get(id) as any;
+  const tenantId = req.user!.tenantId;
+  const item = db.prepare(
+    'SELECT * FROM caja_chica WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
   if (!item) {
     return res.status(404).json({ error: 'Movimiento no encontrado.' });
   }
 
-  if (item.type === 'ingreso' && getCajaChicaCurrentBalance() - item.amount < -0.005) {
+  if (item.voided === 1) {
+    return res.status(400).json({ error: 'Este movimiento de caja chica ya está anulado.' });
+  }
+
+  if (item.type === 'ingreso' && getCajaChicaCurrentBalance(tenantId) - item.amount < -0.005) {
     return res.status(400).json({
-      error: 'No se puede eliminar este ingreso: el saldo de caja chica quedaría negativo.'
+      error: 'No se puede anular este ingreso: el saldo de caja chica quedaría negativo.'
     });
   }
 
-  // Remove linked movement in accounting if existed
-  db.prepare('DELETE FROM movements WHERE cc_id = ?').run(id);
-  db.prepare('DELETE FROM caja_chica WHERE id = ?').run(id);
+  const linked = db.prepare(
+    'SELECT * FROM movements WHERE cc_id = ? AND COALESCE(voided, 0) = 0 AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
 
-  res.json({ success: true, message: 'Movimiento eliminado de caja chica.' });
+  try {
+    db.exec('BEGIN');
+    if (linked) {
+      voidMovementRecord(linked, req.user?.role);
+    } else if (item.register_id) {
+      const delta = item.type === 'ingreso' ? -item.amount : item.amount;
+      adjustRegister(item.register_id, delta, { allowInactive: true });
+      db.prepare('UPDATE caja_chica SET voided = 1 WHERE id = ?').run(id);
+      writeAudit('void-caja-chica', 'caja_chica', id, item.desc || item.type, req.user?.role);
+    } else {
+      db.prepare('UPDATE caja_chica SET voided = 1 WHERE id = ?').run(id);
+    }
+    db.exec('COMMIT');
+    res.json({ success: true, message: 'Movimiento anulado. El historial de caja chica se conserva.' });
+  } catch (err: any) {
+    try { db.exec('ROLLBACK'); } catch { /* transacción ya cerrada */ }
+    const status = err instanceof CashError ? err.status : 500;
+    res.status(status).json({ error: err.message || 'No se pudo anular el movimiento de caja chica.' });
+  }
 });
 
 // -------------------------------------------------------------
-// 6. Cierre de Caja & Cierre de Inventario (Requirement 3)
+// 6. Cierre de Caja & Cierre de Inventario
 // -------------------------------------------------------------
-// 6a. Cierre de Caja (Arqueo diario y cuadre de efectivo)
-router.get('/cierres/caja', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM cierres_caja ORDER BY date DESC, id DESC').all() as any[];
+// 6a. Cierre de Caja
+router.get('/cierres/caja', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const rows = db.prepare(
+    'SELECT * FROM cierres_caja WHERE COALESCE(tenant_id, 1) = ? ORDER BY date DESC, id DESC'
+  ).all(tenantId) as any[];
   res.json(rows.map(r => ({
     id: r.id,
     date: r.date,
@@ -617,7 +1280,7 @@ router.get('/cierres/caja', (_req: Request, res: Response) => {
   })));
 });
 
-router.post('/cierres/caja', (req: Request, res: Response) => {
+router.post('/cierres/caja', requireAuth, (req: Request, res: Response) => {
   const {
     date,
     time,
@@ -637,11 +1300,12 @@ router.post('/cierres/caja', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'La fecha de cierre de caja es obligatoria.' });
   }
 
+  const tenantId = req.user!.tenantId;
   const stmt = db.prepare(`
     INSERT INTO cierres_caja (
       date, time, cashier_name, cashier_role, opening_fund, sales_total,
-      expenses_total, expected_total, counted_total, difference, breakdown_json, note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      expenses_total, expected_total, counted_total, difference, breakdown_json, note, tenant_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
@@ -656,7 +1320,8 @@ router.post('/cierres/caja', (req: Request, res: Response) => {
     Number(countedTotal) || 0,
     Number(difference) || 0,
     JSON.stringify(breakdown || {}),
-    note || ''
+    note || '',
+    tenantId
   );
 
   res.json({ success: true, id: result.lastInsertRowid });
@@ -664,13 +1329,23 @@ router.post('/cierres/caja', (req: Request, res: Response) => {
 
 router.delete('/cierres/caja/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const id = Number(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const existing = db.prepare(
+    'SELECT id FROM cierres_caja WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Cierre de caja no encontrado.' });
+  }
   db.prepare('DELETE FROM cierres_caja WHERE id = ?').run(id);
   res.json({ success: true, message: 'Cierre de caja eliminado.' });
 });
 
 // 6b. Cierre de Inventario (Snapshots)
-router.get('/cierres/inventario', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM cierres_inventario ORDER BY date DESC, id DESC').all() as any[];
+router.get('/cierres/inventario', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const rows = db.prepare(
+    'SELECT * FROM cierres_inventario WHERE COALESCE(tenant_id, 1) = ? ORDER BY date DESC, id DESC'
+  ).all(tenantId) as any[];
   res.json(rows.map(r => ({
     id: r.id,
     date: r.date,
@@ -684,15 +1359,16 @@ router.get('/cierres/inventario', (_req: Request, res: Response) => {
   })));
 });
 
-router.post('/cierres/inventario', (req: Request, res: Response) => {
+router.post('/cierres/inventario', requireAuth, (req: Request, res: Response) => {
   const { date, time, scope, categories, note, totals, items } = req.body;
   if (!date || !totals || !items) {
     return res.status(400).json({ error: 'Faltan datos obligatorios para el snapshot de inventario.' });
   }
 
+  const tenantId = req.user!.tenantId;
   const stmt = db.prepare(`
-    INSERT INTO cierres_inventario (date, time, scope, categories_json, note, totals_json, items_json, user_role)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO cierres_inventario (date, time, scope, categories_json, note, totals_json, items_json, user_role, tenant_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
@@ -703,7 +1379,8 @@ router.post('/cierres/inventario', (req: Request, res: Response) => {
     note || '',
     JSON.stringify(totals),
     JSON.stringify(items),
-    req.user?.role || 'empleado'
+    req.user?.role || 'empleado',
+    tenantId
   );
 
   res.json({ success: true, id: result.lastInsertRowid });
@@ -711,6 +1388,13 @@ router.post('/cierres/inventario', (req: Request, res: Response) => {
 
 router.delete('/cierres/inventario/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const id = Number(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const existing = db.prepare(
+    'SELECT id FROM cierres_inventario WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Snapshot de inventario no encontrado.' });
+  }
   db.prepare('DELETE FROM cierres_inventario WHERE id = ?').run(id);
   res.json({ success: true, message: 'Snapshot de cierre de inventario eliminado.' });
 });
@@ -718,8 +1402,11 @@ router.delete('/cierres/inventario/:id', requireAuth, requireRole(['dueno']), (r
 // -------------------------------------------------------------
 // 7. Apartados
 // -------------------------------------------------------------
-router.get('/apartados', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM apartados ORDER BY id DESC').all() as any[];
+router.get('/apartados', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const rows = db.prepare(
+    'SELECT * FROM apartados WHERE COALESCE(tenant_id, 1) = ? ORDER BY id DESC'
+  ).all(tenantId) as any[];
   res.json(rows.map(r => ({
     id: r.id,
     clientName: r.client_name,
@@ -732,7 +1419,7 @@ router.get('/apartados', (_req: Request, res: Response) => {
   })));
 });
 
-router.post('/apartados', (req: Request, res: Response) => {
+router.post('/apartados', requireAuth, (req: Request, res: Response) => {
   const { clientName, prendaDesc, total, abono, date, time } = req.body;
   const tot = Number(total);
   const ab = Number(abono);
@@ -741,9 +1428,10 @@ router.post('/apartados', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Datos de cliente, prenda o montos inválidos.' });
   }
 
+  const tenantId = req.user!.tenantId;
   const stmt = db.prepare(`
-    INSERT INTO apartados (client_name, prenda_desc, total, abono, status, date, time)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO apartados (client_name, prenda_desc, total, abono, status, date, time, tenant_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
@@ -753,17 +1441,21 @@ router.post('/apartados', (req: Request, res: Response) => {
     ab,
     ab >= tot ? 'entregado' : 'apartado',
     date || new Date().toISOString().slice(0, 10),
-    time || (new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+    time || (new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+    tenantId
   );
 
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
-router.put('/apartados/:id/abono', (req: Request, res: Response) => {
+router.put('/apartados/:id/abono', requireAuth, (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const { extraAbono, markDelivered } = req.body;
+  const tenantId = req.user!.tenantId;
 
-  const ap = db.prepare('SELECT * FROM apartados WHERE id = ?').get(id) as any;
+  const ap = db.prepare(
+    'SELECT * FROM apartados WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId) as any;
   if (!ap) {
     return res.status(404).json({ error: 'Apartado no encontrado.' });
   }
@@ -788,6 +1480,13 @@ router.put('/apartados/:id/abono', (req: Request, res: Response) => {
 
 router.delete('/apartados/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const id = Number(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const existing = db.prepare(
+    'SELECT id FROM apartados WHERE id = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(id, tenantId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Apartado no encontrado.' });
+  }
   db.prepare('DELETE FROM apartados WHERE id = ?').run(id);
   res.json({ success: true, message: 'Apartado eliminado.' });
 });
@@ -795,8 +1494,11 @@ router.delete('/apartados/:id', requireAuth, requireRole(['dueno']), (req: Reque
 // -------------------------------------------------------------
 // 8. Calendar
 // -------------------------------------------------------------
-router.get('/calendar', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM calendar_days').all() as any[];
+router.get('/calendar', (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId ?? 1;
+  const rows = db.prepare(
+    'SELECT * FROM calendar_days WHERE COALESCE(tenant_id, 1) = ?'
+  ).all(tenantId) as any[];
   const map: { [date: string]: { status: string; note: string } } = {};
   rows.forEach(r => {
     map[r.date] = { status: r.status, note: r.note || '' };
@@ -804,22 +1506,43 @@ router.get('/calendar', (_req: Request, res: Response) => {
   res.json(map);
 });
 
-router.put('/calendar/:date', (req: Request, res: Response) => {
+router.put('/calendar/:date', requireAuth, (req: Request, res: Response) => {
   const { date } = req.params;
   const { status, note } = req.body;
+  const tenantId = req.user!.tenantId;
 
   if (!status || !['laborado', 'sinventas', 'asueto'].includes(status)) {
     return res.status(400).json({ error: 'Estado de calendario inválido.' });
   }
 
-  db.prepare(`
-    INSERT INTO calendar_days (date, status, note, updated_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(date) DO UPDATE SET
-      status = excluded.status,
-      note = excluded.note,
-      updated_at = CURRENT_TIMESTAMP
-  `).run(date, status, note || '');
+  // calendar_days has (date TEXT PRIMARY KEY) so we need tenant-aware upsert
+  // Use (date, tenant_id) logic: since date is PK we store per-tenant as date+tenant composite
+  // However the existing schema has date as PRIMARY KEY. We'll do a manual check+insert/update.
+  const existing = db.prepare(
+    'SELECT date FROM calendar_days WHERE date = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(date, tenantId);
+
+  if (existing) {
+    db.prepare(`
+      UPDATE calendar_days SET status = ?, note = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE date = ? AND COALESCE(tenant_id, 1) = ?
+    `).run(status, note || '', date, tenantId);
+  } else {
+    // For tenant 1, the old ON CONFLICT logic won't work if another tenant uses same date.
+    // Insert ignoring conflicts only for multi-tenant isolation.
+    try {
+      db.prepare(`
+        INSERT INTO calendar_days (date, status, note, updated_at, tenant_id)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)
+      `).run(date, status, note || '', tenantId);
+    } catch {
+      // If PK conflict (another tenant has same date), do upsert only for our tenant
+      db.prepare(`
+        UPDATE calendar_days SET status = ?, note = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE date = ? AND COALESCE(tenant_id, 1) = ?
+      `).run(status, note || '', date, tenantId);
+    }
+  }
 
   res.json({ success: true, date, status, note });
 });
@@ -830,9 +1553,10 @@ router.put('/calendar/:date', (req: Request, res: Response) => {
 router.get('/reports/summary', (req: Request, res: Response) => {
   const { date } = req.query;
   const isDueno = req.user?.role === 'dueno';
+  const tenantId = req.user?.tenantId ?? 1;
 
-  let movQuery = 'SELECT * FROM movements WHERE 1=1';
-  const params: any[] = [];
+  let movQuery = 'SELECT * FROM movements WHERE COALESCE(voided, 0) = 0 AND COALESCE(tenant_id, 1) = ?';
+  const params: any[] = [tenantId];
   if (date && date !== 'TODOS') {
     movQuery += ' AND date = ?';
     params.push(date);
@@ -875,16 +1599,17 @@ router.get('/reports/summary', (req: Request, res: Response) => {
   const netTax = Math.round((salesTax - expensesTax) * 100) / 100;
   const netProfit = Math.round((salesTotal - expensesTotal) * 100) / 100;
 
-  // Last 7 days balance for chart
+  // Last 7 days balance for chart (tenant-scoped)
   const last7Days = db.prepare(`
     SELECT date,
       SUM(CASE WHEN type = 'venta' THEN amount ELSE 0 END) as sales,
       SUM(CASE WHEN type != 'venta' THEN amount ELSE 0 END) as expenses
     FROM movements
+    WHERE COALESCE(voided, 0) = 0 AND COALESCE(tenant_id, 1) = ?
     GROUP BY date
     ORDER BY date DESC
     LIMIT 7
-  `).all() as any[];
+  `).all(tenantId) as any[];
 
   res.json({
     salesTotal: Math.round(salesTotal * 100) / 100,

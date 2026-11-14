@@ -360,6 +360,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                     </label>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       min="0"
                       value={openingFund}
@@ -379,6 +380,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                       <div className="flex items-center gap-1">
                         <input
                           type="number"
+                          inputMode="decimal"
                           min="0"
                           value={breakdown[d.key] || 0}
                           onChange={(e) => {

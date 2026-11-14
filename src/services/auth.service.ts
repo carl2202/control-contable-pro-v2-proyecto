@@ -113,4 +113,28 @@ export const AuthService = {
       throw error;
     }
   },
+
+  /**
+   * Registra una nueva cuenta / negocio en la nube con aislamiento de datos.
+   */
+  async register(data: {
+    username: string;
+    password: string;
+    businessName: string;
+  }): Promise<AuthSession> {
+    try {
+      const result = await apiRequest<AuthSession>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (result.token) {
+        localStorage.setItem('contable_token', result.token);
+        localStorage.setItem('contable_user', JSON.stringify(result.user));
+      }
+      return result;
+    } catch (error) {
+      console.error('Error en AuthService.register:', error);
+      throw error;
+    }
+  },
 };

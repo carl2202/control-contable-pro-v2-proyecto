@@ -1,5 +1,6 @@
 import React from 'react';
 import { ActiveModule } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   activeModule: ActiveModule;
@@ -7,6 +8,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
+  const { isOwner } = useAuth();
+
   return (
     <aside className="modules-sidebar-right" aria-label="Navegación de Módulos">
       <div className="sidebar-panel-card">
@@ -185,6 +188,34 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
+
+          {/* Módulo Admin: Exclusivo para Dueño */}
+          {isOwner && (
+            <button
+              type="button"
+              className={`module-btn ${activeModule === 'admin' ? 'active' : ''}`}
+              onClick={() => onSelectModule('admin')}
+              title="Gestión de Cajas, Usuarios y Permisos"
+              style={{
+                marginTop: '8px',
+                borderTop: '1px dashed var(--border)',
+                paddingTop: '10px',
+              }}
+            >
+              <span className="module-key-code" style={{ fontSize: '0.65rem', padding: '2px 4px' }}>ADM</span>
+              <span className="module-icon-box" style={{ background: 'rgba(79, 111, 82, 0.15)', color: 'var(--primary)' }} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </span>
+              <span className="module-info">
+                <span className="module-name" style={{ color: 'var(--primary)', fontWeight: 700 }}>Administración</span>
+                <span className="module-desc">Cajas & Usuarios</span>
+              </span>
+              <span className="module-indicator" aria-hidden="true"></span>
+            </button>
+          )}
         </nav>
 
         <div className="sidebar-footer-info">
@@ -198,3 +229,4 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
     </aside>
   );
 }
+export default Sidebar;

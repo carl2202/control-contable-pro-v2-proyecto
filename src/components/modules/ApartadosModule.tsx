@@ -310,6 +310,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0.01"
                   value={totalAmount}
@@ -326,6 +327,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   value={initialAbono}
@@ -511,6 +513,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   value={abonoModalState.extraAbono}

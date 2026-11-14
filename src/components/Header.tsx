@@ -1,31 +1,25 @@
 // ============================================================
 // Header.tsx
-// Encabezado principal de la aplicación.
-//
-// Muestra:
-//   • Área de marca (logo SVG, nombre del sistema, subtítulo).
-//   • Insignia de usuario activo con su rol y botones de acción.
-//   • Badge de estado del sistema ("MODO CAJERO: ALTA VELOCIDAD").
-//   • Botón de exportar respaldo CSV.
-//
-// Props:
-//   onOpenLogin  — abre el LoginModal para cambiar de rol.
-//   onExportCSV  — dispara la exportación de respaldo CSV.
-//
-// Clases CSS: definidas en css/layout.css
-//   header, .terminal-brand-area, .terminal-sys-badge,
-//   .header-actions, .terminal-telemetry-badge, .btn-*
+// Encabezado principal de la aplicación con soporte para:
+//   • Indicador de sincronización en la nube (SyncIndicator)
+//   • Interruptor discreto de modo claro / oscuro (DarkModeToggle)
+//   • Acceso rápido al buscador global (Ctrl + K)
+//   • Navegación adaptativa para dispositivos móviles y escritorio
 // ============================================================
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFeedback } from '../context/FeedbackContext';
+import DarkModeToggle from './DarkModeToggle';
+import SyncIndicator from './SyncIndicator';
 
 interface HeaderProps {
   onOpenLogin: () => void;
   onExportCSV: () => void;
+  onOpenSearch?: () => void;
+  onToggleSidebar?: () => void;
 }
 
-export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
+export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar }: HeaderProps) {
   const { user, logout, isOwner } = useAuth();
   const { showToast } = useFeedback();
 
@@ -36,13 +30,51 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
   };
 
   return (
-    <header className="mb-4" role="banner">
+    <header className="mb-4" role="banner" style={{ transition: 'var(--transition-smooth)' }}>
       {/* ── Área de marca ── */}
       <div className="terminal-brand-area">
-        {/* Insignia "SISTEMA ACTIVO" con punto pulsante */}
-        <div className="terminal-sys-badge" aria-label="Sistema operativo">
-          <span className="sys-pulse" aria-hidden="true" />
-          <span>SISTEMA ACTIVO • CONTROL CONTABLE</span>
+        {/* Barra superior con status, sincronización y tema */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+          {/* Botón hamburguesa móvil */}
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="btn btn-outline"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '40px',
+                minHeight: '36px',
+                padding: '4px 8px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#FFFFFF',
+              }}
+              aria-label="Abrir menú de navegación móvil"
+              title="Módulos del Sistema"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+          )}
+
+          {/* Insignia "SISTEMA ACTIVO" */}
+          <div className="terminal-sys-badge" aria-label="Sistema operativo">
+            <span className="sys-pulse" aria-hidden="true" />
+            <span>SISTEMA ACTIVO • CONTROL CONTABLE</span>
+          </div>
+
+          {/* Indicador de sincronización en la nube */}
+          <SyncIndicator />
+
+          {/* Interruptor de modo oscuro corporativo */}
+          <DarkModeToggle />
         </div>
 
         {/* Título principal con ícono SVG de tienda */}
@@ -58,7 +90,6 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              {/* Ícono de bolsa / tienda de ropa */}
               <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
               <path d="M3 6h18" />
               <path d="M16 10a4 4 0 0 1-8 0" />
@@ -68,11 +99,52 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
         </h1>
 
         {/* Subtítulo con contexto fiscal */}
-        <p>El Salvador • Régimen Fiscal IVA 13% • Control de Caja e Inventario Inteligente</p>
+        <p>El Salvador • Régimen Fiscal IVA 13% • Control de Cajas, Inventario y Arqueos en Tiempo Real</p>
       </div>
 
-      {/* ── Área de acciones (sesión + exportar) ── */}
-      <div className="header-actions">
+      {/* ── Área de acciones (sesión + buscador + exportar) ── */}
+      <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {/* Botón rápido del Buscador Global (Ctrl + K) */}
+        {onOpenSearch && (
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="btn btn-outline"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              minHeight: '38px',
+              padding: '0 12px',
+              fontSize: '0.8rem',
+              background: 'rgba(255,255,255,0.12)',
+              border: '1px solid rgba(255,255,255,0.24)',
+              color: '#FFFFFF',
+              borderRadius: 'var(--radius-md)',
+            }}
+            title="Búsqueda rápida en el sistema (Ctrl + K)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>Buscar</span>
+            <kbd
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.68rem',
+                padding: '1px 5px',
+                borderRadius: '3px',
+                background: 'rgba(0,0,0,0.25)',
+                color: 'rgba(255,255,255,0.85)',
+                marginLeft: '4px',
+              }}
+            >
+              Ctrl+K
+            </kbd>
+          </button>
+        )}
+
         {user ? (
           /* ── Usuario autenticado: insignia de rol + botones ── */
           <div
@@ -87,7 +159,6 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
             }}
             aria-label={`Sesión activa: ${user.displayName}`}
           >
-            {/* Ícono de usuario SVG */}
             <svg
               width="16"
               height="16"
@@ -104,15 +175,12 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
             </svg>
 
             <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-              {/* Nombre del usuario */}
               <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#FFFFFF', lineHeight: 1.2 }}>
                 {user.displayName || user.username}
               </span>
-              {/* Etiqueta de rol con ícono */}
               <span style={{ fontSize: '0.68rem', color: '#D1FAE5', lineHeight: 1.2 }}>
                 {isOwner ? (
                   <>
-                    {/* Ícono corona para dueño */}
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
                       style={{ display: 'inline', verticalAlign: '-1px', marginRight: '3px' }}
@@ -123,7 +191,6 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
                   </>
                 ) : (
                   <>
-                    {/* Ícono maletín para empleado */}
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
                       style={{ display: 'inline', verticalAlign: '-1px', marginRight: '3px' }}
@@ -137,13 +204,12 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
               </span>
             </div>
 
-            {/* Botón para cambiar de rol (re-abre el LoginModal) */}
             <button
               type="button"
               onClick={onOpenLogin}
               style={{
                 fontSize: '0.7rem',
-                padding: '3px 8px',
+                padding: '4px 8px',
                 borderRadius: 'var(--radius-sm)',
                 background: 'rgba(255,255,255,0.14)',
                 border: '1px solid rgba(255,255,255,0.28)',
@@ -151,19 +217,19 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
                 cursor: 'pointer',
                 transition: 'var(--transition-smooth)',
                 whiteSpace: 'nowrap',
+                minHeight: '32px',
               }}
               title="Cambiar de usuario o rol"
             >
               Cambiar Rol
             </button>
 
-            {/* Botón de cerrar sesión */}
             <button
               type="button"
               onClick={handleLogout}
               style={{
                 fontSize: '0.7rem',
-                padding: '3px 8px',
+                padding: '4px 8px',
                 borderRadius: 'var(--radius-sm)',
                 background: 'rgba(178,96,63,0.25)',
                 border: '1px solid rgba(178,96,63,0.5)',
@@ -171,6 +237,7 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
                 cursor: 'pointer',
                 transition: 'var(--transition-smooth)',
                 whiteSpace: 'nowrap',
+                minHeight: '32px',
               }}
               title="Cerrar sesión actual"
             >
@@ -178,14 +245,12 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
             </button>
           </div>
         ) : (
-          /* ── Sin sesión: botón de Iniciar Sesión ── */
           <button
             type="button"
             onClick={onOpenLogin}
             className="btn btn-primary"
-            style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', minHeight: '44px' }}
           >
-            {/* Ícono de candado */}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -207,9 +272,8 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
           className="btn btn-success"
           onClick={onExportCSV}
           title="Descargar copia de seguridad completa en CSV / Excel"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', minHeight: '44px' }}
         >
-          {/* Ícono de descarga SVG */}
           <svg
             width="15"
             height="15"
@@ -231,3 +295,4 @@ export function Header({ onOpenLogin, onExportCSV }: HeaderProps) {
     </header>
   );
 }
+export default Header;

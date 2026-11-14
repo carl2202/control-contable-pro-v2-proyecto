@@ -736,6 +736,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                             <div className="mt-1">
                               <input
                                 type="number"
+                                inputMode="decimal"
                                 min={0}
                                 max={v.stock}
                                 disabled={isOut}
@@ -808,6 +809,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                   </label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0.01"
                     value={manualAmount}
@@ -895,25 +897,37 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                 <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                   <th className="p-2.5">Hora / Fecha</th>
                   <th className="p-2.5">Tipo</th>
+                  <th className="p-2.5">Caja</th>
                   <th className="p-2.5">Comprobante / Vale</th>
                   <th className="p-2.5">Descripción</th>
-                  <th className="p-2.5 text-right">Monto ($)</th>
+                  <th className="p-2.5 text-right">Débito (-)</th>
+                  <th className="p-2.5 text-right">Crédito (+)</th>
                   <th className="p-2.5 text-right">IVA 13%</th>
+                  <th className="p-2.5 text-center">Estado</th>
                   <th className="p-2.5 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredMovements.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-4 text-center text-[#6F7B72]">
+                    <td colSpan={10} className="p-4 text-center text-[#6F7B72]">
                       No se encontraron movimientos para los filtros seleccionados.
                     </td>
                   </tr>
                 ) : (
                   filteredMovements.map((m) => {
                     const isVenta = m.type === 'venta';
+                    const debitAmt = m.debit !== undefined ? m.debit : (!isVenta ? m.amount : 0);
+                    const creditAmt = m.credit !== undefined ? m.credit : (isVenta ? m.amount : 0);
+                    const isVoided = m.voided === true;
+
                     return (
-                      <tr key={m.id} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
+                      <tr
+                        key={m.id}
+                        className={`border-b border-[#E6EBDF] transition-colors ${
+                          isVoided ? 'opacity-60 bg-red-50/20' : 'hover:bg-[#E6EBDF]/60'
+                        }`}
+                      >
                         <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                           {m.time || '--:--'}
                           {activeTab === 'TODOS' && m.date && (
@@ -929,6 +943,15 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                             {m.type.toUpperCase()}
                           </span>
                         </td>
+                        <td className="p-2.5 whitespace-nowrap font-medium text-[#46524A]">
+                          <span className="inline-flex items-center gap-1">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4F6F52]">
+                              <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                            </svg>
+                            {m.registerName || 'Caja Principal'}
+                          </span>
+                        </td>
                         <td className="p-2.5 whitespace-nowrap">
                           <span className="badge badge-cat">{m.doc}</span>
                           {m.voucherCode && (
@@ -938,27 +961,41 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                           )}
                         </td>
                         <td className="p-2.5 max-w-xs break-words">
-                          <span className="text-[#2F3A33] font-medium">{m.desc}</span>
+                          <span className={`font-medium ${isVoided ? 'line-through text-[#6F7B72]' : 'text-[#2F3A33]'}`}>
+                            {m.desc}
+                          </span>
                         </td>
-                        <td
-                          className={`p-2.5 text-right font-bold whitespace-nowrap ${
-                            isVenta ? 'text-[#2F4A38]' : 'text-[#B2603F]'
-                          }`}
-                        >
-                          {isVenta ? '+' : '-'}${m.amount.toFixed(2)}
+                        <td className="p-2.5 text-right font-bold whitespace-nowrap text-[#B2603F]">
+                          {debitAmt > 0 ? `-$${debitAmt.toFixed(2)}` : '—'}
+                        </td>
+                        <td className="p-2.5 text-right font-bold whitespace-nowrap text-[#2F4A38]">
+                          {creditAmt > 0 ? `+$${creditAmt.toFixed(2)}` : '—'}
                         </td>
                         <td className="p-2.5 text-right text-[#6F7B72] whitespace-nowrap">
                           ${(m.tax || 0).toFixed(2)}
                         </td>
                         <td className="p-2.5 text-center whitespace-nowrap">
-                          {isOwner ? (
+                          {isVoided ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-700 border border-red-200">
+                              Anulado
+                            </span>
+                          ) : (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Válido
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-center whitespace-nowrap">
+                          {isVoided ? (
+                            <span className="text-[10px] text-[#9AA59C] font-mono">Inmutable</span>
+                          ) : isOwner ? (
                             <button
                               type="button"
                               className="btn btn-danger btn-table-action text-[11px] px-2 py-0.5"
                               onClick={() => handleDeleteMovement(m)}
-                              title="Eliminar movimiento y devolver stock"
+                              title="Anular movimiento e inactivar registro con auditoría inmutable"
                             >
-                              ✕ Eliminar
+                              ✕ Anular
                             </button>
                           ) : (
                             <span className="text-[10px] text-[#9AA59C] italic">Solo Dueño</span>

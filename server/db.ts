@@ -141,38 +141,97 @@ db.exec(`
     name TEXT PRIMARY KEY,
     next_val INTEGER NOT NULL DEFAULT 1
   );
+
+  CREATE TABLE IF NOT EXISTS cash_registers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('operativa', 'chica')),
+    balance REAL NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS login_challenges (
+    id TEXT PRIMARY KEY,
+    answer_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT,
+    detail TEXT,
+    user_role TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+
+function tableHasColumn(table: string, column: string): boolean {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return cols.some((col) => col.name === column);
+}
+
+function ensureColumn(table: string, column: string, definition: string) {
+  if (!tableHasColumn(table, column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+  }
+}
+
+ensureColumn('sessions', 'last_seen_at', 'last_seen_at DATETIME');
+ensureColumn('movements', 'register_id', 'register_id INTEGER');
+ensureColumn('movements', 'debit', 'debit REAL NOT NULL DEFAULT 0');
+ensureColumn('movements', 'credit', 'credit REAL NOT NULL DEFAULT 0');
+ensureColumn('movements', 'voided', 'voided INTEGER NOT NULL DEFAULT 0');
+ensureColumn('caja_chica', 'register_id', 'register_id INTEGER');
+ensureColumn('caja_chica', 'voided', 'voided INTEGER NOT NULL DEFAULT 0');
+ensureColumn('users', 'active', 'active INTEGER NOT NULL DEFAULT 1');
+
+// Multi-tenant columns: tenant_id DEFAULT 1 preserves all historical data
+ensureColumn('users', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('movements', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('inventory_items', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('inventory_variants', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('apartados', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('caja_chica', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('cierres_inventario', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('cierres_caja', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('calendar_days', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('cash_registers', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('active_dates', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
 
 // Seed default users if none exist
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
 if (userCount.count === 0) {
   const insertUser = db.prepare(`
-    INSERT INTO users (username, password_hash, pin, role, display_name)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO users (username, password_hash, pin, role, display_name, tenant_id)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
   // Seed Dueño (Owner) - PIN: 1234
-  insertUser.run('dueno', 'admin123', '1234', 'dueno', 'Don Roberto (Dueño / Admin)');
+  insertUser.run('dueno', 'admin123', '1234', 'dueno', 'Don Roberto (Dueño / Admin)', 1);
   // Seed Empleado (Employee) - PIN: 0000
-  insertUser.run('empleado', 'caja123', '0000', 'empleado', 'Ana Martínez (Cajera / Empleada)');
+  insertUser.run('empleado', 'caja123', '0000', 'empleado', 'Ana Martínez (Cajera / Empleada)', 1);
 }
 
 // Seed default active date (today) if none
 const todayIso = new Date().toISOString().slice(0, 10);
 const dateExists = db.prepare('SELECT date FROM active_dates WHERE date = ?').get(todayIso);
 if (!dateExists) {
-  db.prepare('INSERT INTO active_dates (date) VALUES (?)').run(todayIso);
+  db.prepare('INSERT INTO active_dates (date, tenant_id) VALUES (?, 1)').run(todayIso);
 }
 
 // Seed initial inventory items if empty so store has immediate apparel data
 const invCount = db.prepare('SELECT COUNT(*) as count FROM inventory_items').get() as { count: number };
 if (invCount.count === 0) {
   const insertItem = db.prepare(`
-    INSERT INTO inventory_items (code, name, audience, category)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO inventory_items (code, name, audience, category, tenant_id)
+    VALUES (?, ?, ?, ?, 1)
   `);
   const insertVariant = db.prepare(`
-    INSERT INTO inventory_variants (item_code, size, color, cost, price, stock)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO inventory_variants (item_code, size, color, cost, price, stock, tenant_id)
+    VALUES (?, ?, ?, ?, ?, ?, 1)
   `);
 
   const initialItems = [
@@ -240,15 +299,15 @@ if (invCount.count === 0) {
   const ccCount = db.prepare('SELECT COUNT(*) as count FROM caja_chica').get() as { count: number };
   if (ccCount.count === 0) {
     db.prepare(`
-      INSERT INTO caja_chica (type, category, desc, amount, date, time, user_role)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO caja_chica (type, category, desc, amount, date, time, user_role, tenant_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
     `).run('ingreso', 'Inyección de Fondo', 'Fondo Inicial de Apertura de Caja Chica', 100.00, todayIso, '08:00 AM', 'dueno');
   }
 
   // Seed sample opening day movements
   db.prepare(`
-    INSERT INTO movements (date, type, desc, amount, tax, doc, voucher_code, time, items_json, user_role)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO movements (date, type, desc, amount, tax, doc, voucher_code, time, items_json, user_role, tenant_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     todayIso,
     'venta',
@@ -275,3 +334,62 @@ export function getNextVoucherNumber(): string {
   }
   return `VLE-${String(nextVal).padStart(4, '0')}`;
 }
+
+function pettyCashLedgerBalance(): number {
+  const rows = db.prepare(
+    'SELECT type, amount FROM caja_chica WHERE COALESCE(voided, 0) = 0'
+  ).all() as { type: string; amount: number }[];
+  let balance = 0;
+  for (const row of rows) {
+    balance += row.type === 'ingreso' ? row.amount : -row.amount;
+  }
+  return Math.round(balance * 100) / 100;
+}
+
+function ensureCashRegisters() {
+  const count = db.prepare('SELECT COUNT(*) as count FROM cash_registers').get() as { count: number };
+  if (count.count === 0) {
+    db.prepare(
+      'INSERT INTO cash_registers (name, kind, balance, active, tenant_id) VALUES (?, ?, ?, 1, 1)'
+    ).run('Caja Principal', 'operativa', 0);
+    db.prepare(
+      'INSERT INTO cash_registers (name, kind, balance, active, tenant_id) VALUES (?, ?, ?, 1, 1)'
+    ).run('Caja Chica', 'chica', pettyCashLedgerBalance());
+  }
+
+  const principal = db.prepare(
+    "SELECT id FROM cash_registers WHERE kind = 'operativa' ORDER BY id LIMIT 1"
+  ).get() as { id: number } | undefined;
+  const chica = db.prepare(
+    "SELECT id FROM cash_registers WHERE kind = 'chica' ORDER BY id LIMIT 1"
+  ).get() as { id: number } | undefined;
+  if (!principal || !chica) return;
+
+  const pending = db.prepare(
+    'SELECT id, type, amount, voided FROM movements WHERE register_id IS NULL'
+  ).all() as { id: number; type: string; amount: number; voided: number }[];
+
+  let principalDelta = 0;
+  const link = db.prepare(
+    'UPDATE movements SET register_id = ?, debit = ?, credit = ? WHERE id = ?'
+  );
+  for (const movement of pending) {
+    const moneyIn = movement.type === 'venta';
+    const registerId = movement.type === 'cajachica' ? chica.id : principal.id;
+    const debit = moneyIn ? 0 : movement.amount;
+    const credit = moneyIn ? movement.amount : 0;
+    link.run(registerId, debit, credit, movement.id);
+    if (movement.type !== 'cajachica' && !movement.voided) {
+      principalDelta += credit - debit;
+    }
+  }
+
+  if (principalDelta !== 0) {
+    db.prepare('UPDATE cash_registers SET balance = ROUND(balance + ?, 2) WHERE id = ?').run(
+      principalDelta,
+      principal.id
+    );
+  }
+}
+
+ensureCashRegisters();

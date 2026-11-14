@@ -25,11 +25,21 @@ interface LoginModalProps {
 
 export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalProps) {
   // Hooks de autenticación y notificaciones
-  const { loginWithPin } = useAuth();
+  const { loginWithPin, registerUser } = useAuth();
   const { showToast } = useFeedback();
 
-  // ── Modo de vista (login o cambio de contraseña) ────────────
-  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+  // ── Modo de vista (login, cambio de contraseña, o registro) ──
+  const [viewMode, setViewMode] = useState<'login' | 'changePassword' | 'register'>('login');
+  const isChangingPassword = viewMode === 'changePassword';
+  const setIsChangingPassword = (val: boolean) => setViewMode(val ? 'changePassword' : 'login');
+
+  // ── Estado del formulario de Registro de Negocio ───────────
+  const [regBusinessName, setRegBusinessName] = useState<string>('');
+  const [regUsername, setRegUsername] = useState<string>('');
+  const [regPassword, setRegPassword] = useState<string>('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState<string>('');
+  const [regErrorMsg, setRegErrorMsg] = useState<string>('');
+  const [isSubmittingReg, setIsSubmittingReg] = useState<boolean>(false);
 
   // ── Estado del formulario de Login ──────────────────────────
   // Rol seleccionado por el usuario (dueno | empleado)
@@ -57,10 +67,15 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
       setPin('');
       setErrorMsg('');
       setChangeErrorMsg('');
+      setRegErrorMsg('');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setIsChangingPassword(false);
+      setRegBusinessName('');
+      setRegUsername('');
+      setRegPassword('');
+      setRegConfirmPassword('');
+      setViewMode('login');
     }
   }, [isOpen]);
 
@@ -792,12 +807,12 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
         </button>
       </div>
 
-      {/* ── Enlace para cambiar contraseñas (Dueño) ── */}
-      <div style={{ textAlign: 'center', marginTop: '6px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+      {/* ── Enlaces secundarios (Cambio de contraseña y Crear Cuenta) ── */}
+      <div style={{ textAlign: 'center', marginTop: '6px', borderTop: '1px solid var(--border)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <button
           type="button"
           onClick={() => {
-            setIsChangingPassword(true);
+            setViewMode('changePassword');
             setChangeErrorMsg('');
             setOldPassword('');
             setNewPassword('');
@@ -812,24 +827,207 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
             color: 'var(--primary)',
             display: 'inline-flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '6px',
             padding: '4px 8px',
             borderRadius: 'var(--radius-sm)',
             transition: 'var(--transition-smooth)',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary-dark)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--primary)')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 2l-2 2m-1.5 1.5L20 7l-3 3-1.5-1.5M10 14l-4 4-2-2 4-4m1.5-1.5L12 8l4 4-1.5 1.5M7 17l-5 5"/>
           </svg>
           ¿Desea cambiar contraseña / PIN? (Dueño)
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setViewMode('register');
+            setRegErrorMsg('');
+            setRegBusinessName('');
+            setRegUsername('');
+            setRegPassword('');
+            setRegConfirmPassword('');
+          }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            color: 'var(--text-muted)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '4px 8px',
+            borderRadius: 'var(--radius-sm)',
+            transition: 'var(--transition-smooth)',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <line x1="19" y1="8" x2="19" y2="14"></line>
+            <line x1="22" y1="11" x2="16" y2="11"></line>
+          </svg>
+          ¿Nuevo negocio? Crear cuenta y registrar tienda
+        </button>
       </div>
     </form>
   );
 
-  const activeContent = isChangingPassword ? changePasswordContent : loginContent;
+  // ── Handler de Registro de Negocio ─────────────────────────
+  const handleSubmitRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regBusinessName.trim()) {
+      setRegErrorMsg('Ingrese el nombre de su negocio o tienda.');
+      return;
+    }
+    if (regUsername.trim().length < 4) {
+      setRegErrorMsg('El usuario debe tener al menos 4 caracteres (solo letras, números y guión bajo).');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setRegErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setRegErrorMsg('Las contraseñas no coinciden.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReg(true);
+      setRegErrorMsg('');
+      const res = await registerUser({
+        businessName: regBusinessName.trim(),
+        username: regUsername.trim(),
+        password: regPassword,
+      });
+
+      if (!res.success) {
+        setRegErrorMsg(res.error || 'No se pudo crear la cuenta.');
+      } else {
+        showToast(`¡Bienvenido! Tienda "${regBusinessName}" creada exitosamente.`, false, 'success');
+        onClose();
+      }
+    } catch (err: any) {
+      setRegErrorMsg(err.message || 'Error inesperado al registrar.');
+    } finally {
+      setIsSubmittingReg(false);
+    }
+  };
+
+  // ── Formulario de Registro de Cuenta Pública ───────────────
+  const registerContent = (
+    <form onSubmit={handleSubmitRegister} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: 700 }}>
+          Registrar Nueva Tienda / Negocio
+        </h3>
+        <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Crea tu espacio con base de datos sincronizada y aislamiento total.
+        </p>
+      </div>
+
+      {regErrorMsg && (
+        <div style={{ background: 'rgba(178,96,63,0.12)', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>
+          {regErrorMsg}
+        </div>
+      )}
+
+      <div>
+        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
+          Nombre de la Tienda / Negocio:
+        </label>
+        <input
+          type="text"
+          value={regBusinessName}
+          onChange={(e) => setRegBusinessName(e.target.value)}
+          placeholder="ej. Boutique La Esmeralda"
+          required
+          className="input-field"
+          style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
+        />
+      </div>
+
+      <div>
+        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
+          Usuario Administrador (Dueño):
+        </label>
+        <input
+          type="text"
+          value={regUsername}
+          onChange={(e) => setRegUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+          placeholder="ej. roberto_admin"
+          required
+          minLength={4}
+          className="input-field"
+          style={{ width: '100%', minHeight: '44px', padding: '0 12px', fontFamily: 'var(--font-mono)' }}
+        />
+      </div>
+
+      <div>
+        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
+          Contraseña (mínimo 6 caracteres):
+        </label>
+        <input
+          type="password"
+          value={regPassword}
+          onChange={(e) => setRegPassword(e.target.value)}
+          placeholder="••••••••"
+          required
+          minLength={6}
+          className="input-field"
+          style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
+        />
+      </div>
+
+      <div>
+        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
+          Confirmar Contraseña:
+        </label>
+        <input
+          type="password"
+          value={regConfirmPassword}
+          onChange={(e) => setRegConfirmPassword(e.target.value)}
+          placeholder="••••••••"
+          required
+          minLength={6}
+          className="input-field"
+          style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={isSubmittingReg}
+        className="btn btn-primary"
+        style={{ minHeight: '44px', marginTop: '6px', width: '100%', fontWeight: 600 }}
+      >
+        {isSubmittingReg ? 'Creando Tienda...' : 'Crear Cuenta y Abrir Tienda'}
+      </button>
+
+      <div style={{ textAlign: 'center', marginTop: '6px' }}>
+        <button
+          type="button"
+          onClick={() => setViewMode('login')}
+          style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+        >
+          ← Volver al Inicio de Sesión
+        </button>
+      </div>
+    </form>
+  );
+
+  const activeContent =
+    viewMode === 'register'
+      ? registerContent
+      : viewMode === 'changePassword' || isChangingPassword
+      ? changePasswordContent
+      : loginContent;
 
   // ── Modo embebido: sin overlay flotante ────────────────────
   if (isEmbedded) {

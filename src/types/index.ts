@@ -5,6 +5,8 @@ export interface User {
   username: string;
   role: Role;
   displayName: string;
+  tenantId?: number;
+  active?: boolean;
 }
 
 export interface AuthSession {
@@ -37,6 +39,11 @@ export interface Movement {
   items?: MovementItem[] | null;
   ccId?: number | null;
   userRole?: string;
+  registerId?: number | null;
+  registerName?: string;
+  debit?: number;
+  credit?: number;
+  voided?: boolean;
   _date?: string;
 }
 
@@ -156,4 +163,4 @@ export interface ReportsSummary {
   chartData: ChartDataPoint[];
 }
 
-export type ActiveModule = 'contable' | 'inventario' | 'apartados' | 'cajaChica' | 'reportes' | 'cierre' | 'calendario';
+export type ActiveModule = 'contable' | 'inventario' | 'apartados' | 'cajaChica' | 'reportes' | 'cierre' | 'calendario' | 'admin';
