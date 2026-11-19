@@ -5,9 +5,10 @@
 import React, { useState } from 'react';
 import { CashRegistersPanel } from './CashRegistersPanel';
 import { UserManagementPanel } from './UserManagementPanel';
+import { BackupsAuditPanel } from './BackupsAuditPanel';
 
 export function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'registers' | 'users'>('registers');
+  const [activeTab, setActiveTab] = useState<'registers' | 'users' | 'backups'>('registers');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -120,11 +121,35 @@ export function AdminPanel() {
             </svg>
             Usuarios y Cajeros
           </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'backups'}
+            onClick={() => setActiveTab('backups')}
+            style={{
+              border: 'none',
+              background: activeTab === 'backups' ? 'var(--surface)' : 'transparent',
+              color: activeTab === 'backups' ? 'var(--primary)' : 'var(--text-body)',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              minHeight: '40px',
+            }}
+          >
+            Respaldos y Auditoría
+          </button>
         </div>
       </div>
 
       {/* Contenido de la pestaña activa */}
-      {activeTab === 'registers' ? <CashRegistersPanel /> : <UserManagementPanel />}
+      {activeTab === 'registers'
+        ? <CashRegistersPanel />
+        : activeTab === 'users'
+          ? <UserManagementPanel />
+          : <BackupsAuditPanel />}
     </div>
   );
 }

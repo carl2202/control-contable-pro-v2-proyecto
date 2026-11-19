@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'node:crypto';
+import 'dotenv/config';
 import { db, getNextVoucherNumber } from './db.js';
+import { createDatabaseBackup, getBackupPath, listDatabaseBackups } from './backup.js';
 
 export const router = express.Router();
 
@@ -57,7 +59,7 @@ function sessionCookie(token: string, maxAge: number): string {
   return [
     `${SESSION_COOKIE}=${token}`,
     'HttpOnly',
-    'Secure',
+    ...(process.env.NODE_ENV === 'production' ? ['Secure'] : []),
     'SameSite=Lax',
     'Path=/',
     `Max-Age=${maxAge}`
@@ -80,6 +82,21 @@ function writeAudit(action: string, entity: string, entityId: string | number | 
 function hashPassword(plain: string): string {
   return crypto.createHash('sha256').update(plain).digest('hex');
 }
+
+function normalizeRecoveryTarget(raw: string): string {
+  const value = raw.trim();
+  return value.includes('@') ? value.toLowerCase() : value.replace(/\D/g, '');
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 
 // -------------------------------------------------------------
 // Auth Middleware & Helpers
@@ -235,7 +252,25 @@ router.post('/auth/login', rateLimit('login', 8, 15 * 60 * 1000), async (req: Re
 
   let user: any = null;
   if (role && pin) {
-    user = db.prepare("SELECT * FROM users WHERE role = ? AND pin = ? AND COALESCE(active, 1) = 1").get(role, String(pin));
+    const matches = db.prepare(
+      "SELECT * FROM users WHERE role = ? AND pin = ? AND COALESCE(active, 1) = 1"
+    ).all(role, String(pin)) as any[];
+    if (matches.length === 1) {
+      user = matches[0];
+    } else if (matches.length > 1) {
+      const requestedUsername = String(username || '').trim().toLowerCase();
+      if (requestedUsername) {
+        user = matches.find((match) =>
+          String(match.username).toLowerCase() === requestedUsername ||
+          String(match.username).toLowerCase() === `${requestedUsername}_empleado`
+        ) || null;
+      }
+      if (!user) {
+        return res.status(409).json({
+          error: 'Este PIN pertenece a varios negocios. Indique el usuario del negocio para continuar.'
+        });
+      }
+    }
   } else if (pin) {
     user = db.prepare('SELECT * FROM users WHERE pin = ? AND COALESCE(active, 1) = 1').get(String(pin));
   } else if (username && password) {
@@ -272,6 +307,150 @@ router.post('/auth/login', rateLimit('login', 8, 15 * 60 * 1000), async (req: Re
   });
 });
 
+// POST /auth/otp/send — Generar y enviar código de verificación (Correo o Teléfono)
+router.post('/auth/otp/send', rateLimit('otp_send', 10, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  const rawTarget = String(req.body?.target || '').trim();
+  if (!rawTarget || rawTarget.length < 4) {
+    return res.status(400).json({ error: 'Ingrese un correo electrónico válido o número de teléfono.' });
+  }
+
+  const cleanTarget = normalizeRecoveryTarget(rawTarget);
+  const digitsOnly = rawTarget.replace(/\D/g, '');
+
+  // Buscar usuario por email o teléfono
+  const user = db.prepare(`
+    SELECT id, username, role, display_name, tenant_id, email, phone
+    FROM users
+    WHERE LOWER(COALESCE(email, '')) = ?
+       OR REPLACE(REPLACE(COALESCE(phone, ''), '-', ''), ' ', '') = ?
+       OR phone = ?
+    LIMIT 1
+  `).get(cleanTarget, digitsOnly, rawTarget) as any;
+
+  if (!user) {
+    return res.status(404).json({
+      error: 'No encontramos ninguna cuenta asociada al correo o teléfono ingresado. Verifique los datos o consulte al Administrador.'
+    });
+  }
+
+  // Generar código numérico de 6 dígitos
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutos de validez
+
+
+  db.prepare(`
+    INSERT INTO otp_codes (target, code, user_id, expires_at, used, tenant_id)
+    VALUES (?, ?, ?, ?, 0, ?)
+  `).run(cleanTarget, code, user.id, expiresAt, user.tenant_id || 1);
+
+  writeAudit('send-otp', 'users', user.id, `Código OTP generado para ${user.display_name}`, user.role);
+
+  // Retornamos el código para facilitar el acceso rápido sin requerir gateway externo de pago
+  const demoOtp = process.env.DEMO_OTP === 'true';
+  res.json({
+    success: true,
+    message: `Código de verificación de 6 dígitos generado con éxito para ${user.display_name}.`,
+    target: rawTarget,
+    ...(demoOtp ? { code } : {})
+  });
+});
+
+// POST /auth/otp/verify — Iniciar sesión directamente con código OTP (Passwordless)
+router.post('/auth/otp/verify', rateLimit('otp_verify', 10, 15 * 60 * 1000), (req: Request, res: Response) => {
+  const rawTarget = normalizeRecoveryTarget(String(req.body?.target || '').trim());
+  const code = String(req.body?.code || '').trim();
+
+  if (!rawTarget || !code) {
+    return res.status(400).json({ error: 'Indique el correo/teléfono y el código de verificación.' });
+  }
+
+  const now = Date.now();
+  const otp = db.prepare(`
+    SELECT * FROM otp_codes
+    WHERE (LOWER(target) = ? OR target = ?) AND code = ? AND used = 0 AND expires_at > ?
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(rawTarget, rawTarget.replace(/\D/g, ''), code, now) as any;
+
+  if (!otp) {
+    return res.status(400).json({ error: 'Código de verificación inválido o expirado. Solicite uno nuevo.' });
+  }
+
+  // Marcar código como usado
+  db.prepare('UPDATE otp_codes SET used = 1 WHERE id = ?').run(otp.id);
+
+  // Obtener usuario
+  const user = db.prepare('SELECT * FROM users WHERE id = ? AND COALESCE(active, 1) = 1').get(otp.user_id) as any;
+  if (!user) {
+    return res.status(404).json({ error: 'La cuenta de usuario no está activa o no existe.' });
+  }
+
+  // Generar sesión segura
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAtIso = new Date(Date.now() + SESSION_MS).toISOString();
+
+  db.prepare(`
+    INSERT INTO sessions (token, user_id, role, username, display_name, expires_at, last_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `).run(token, user.id, user.role, user.username, user.display_name, expiresAtIso);
+
+  writeAudit('otp-login', 'users', user.id, `Inicio de sesión sin contraseña (OTP) de ${user.display_name}`, user.role);
+
+  res.setHeader('Set-Cookie', sessionCookie(token, Math.floor(SESSION_MS / 1000)));
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      displayName: user.display_name,
+      tenantId: user.tenant_id || 1
+    }
+  });
+});
+
+// POST /auth/recover-account — Recuperar cuenta y restablecer clave mediante código OTP
+router.post('/auth/recover-account', rateLimit('recover', 6, 15 * 60 * 1000), (req: Request, res: Response) => {
+  const rawTarget = normalizeRecoveryTarget(String(req.body?.target || '').trim());
+  const code = String(req.body?.code || '').trim();
+  const newPassword = String(req.body?.newPassword || '').trim();
+
+  if (!rawTarget || !code) {
+    return res.status(400).json({ error: 'Indique su correo/teléfono y el código recibido.' });
+  }
+
+  if (!/^\d{4,6}$/.test(newPassword)) {
+    return res.status(400).json({ error: 'El nuevo PIN debe contener entre 4 y 6 dígitos.' });
+  }
+
+  const now = Date.now();
+  const otp = db.prepare(`
+    SELECT * FROM otp_codes
+    WHERE (LOWER(target) = ? OR target = ?) AND code = ? AND used = 0 AND expires_at > ?
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(rawTarget, rawTarget.replace(/\D/g, ''), code, now) as any;
+
+  if (!otp) {
+    return res.status(400).json({ error: 'Código de verificación inválido o expirado. Solicite uno nuevo.' });
+  }
+
+  // Marcar como usado
+  db.prepare('UPDATE otp_codes SET used = 1 WHERE id = ?').run(otp.id);
+
+  // Actualizar credenciales del usuario
+  const pwHash = hashPassword(newPassword);
+  db.prepare('UPDATE users SET pin = ?, password_hash = ? WHERE id = ?').run(newPassword, pwHash, otp.user_id);
+
+  writeAudit('recover-account', 'users', otp.user_id, 'Restablecimiento de clave mediante verificación OTP', 'dueno');
+
+  res.json({
+    success: true,
+    message: 'Contraseña y PIN restablecidos exitosamente. Ahora puede iniciar sesión con su nueva clave.'
+  });
+});
+
 // POST /auth/register — Register a new business (new tenant)
 router.post('/auth/register', rateLimit('register', 3, 15 * 60 * 1000), async (req: Request, res: Response) => {
   // Honeypot
@@ -280,7 +459,10 @@ router.post('/auth/register', rateLimit('register', 3, 15 * 60 * 1000), async (r
 
   const username = String(req.body?.username || '').trim();
   const password = String(req.body?.password || '').trim();
+  const pin = String(req.body?.pin || '').trim();
   const businessName = String(req.body?.businessName || '').trim();
+  const email = String(req.body?.email || '').trim().toLowerCase() || null;
+  const phone = String(req.body?.phone || '').trim().replace(/\D/g, '') || null;
 
   // Validate username: at least 4 chars, alphanumeric + underscore only
   if (!/^[a-zA-Z0-9_]{4,}$/.test(username)) {
@@ -291,14 +473,40 @@ router.post('/auth/register', rateLimit('register', 3, 15 * 60 * 1000), async (r
   if (password.length < 6) {
     return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
   }
+  if (!/^\d{4,6}$/.test(pin)) {
+    return res.status(400).json({ error: 'El PIN debe contener entre 4 y 6 dígitos.' });
+  }
   if (businessName.length < 2) {
     return res.status(400).json({ error: 'Indique el nombre del negocio (mínimo 2 caracteres).' });
+  }
+  if (!email && !phone) {
+    return res.status(400).json({ error: 'Indique un correo electrónico o teléfono para recuperación.' });
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'El correo electrónico de recuperación no es válido.' });
+  }
+  if (phone && phone.length < 8) {
+    return res.status(400).json({ error: 'El teléfono de recuperación debe tener al menos 8 dígitos.' });
   }
 
   // Check username uniqueness
   const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
   if (existing) {
     return res.status(409).json({ error: 'Ese nombre de usuario ya está en uso. Elija otro.' });
+  }
+  if (email) {
+    const existingEmail = db.prepare('SELECT id FROM users WHERE LOWER(COALESCE(email, \'\')) = ?').get(email);
+    if (existingEmail) {
+      return res.status(409).json({ error: 'Ese correo electrónico ya está asociado a otra cuenta.' });
+    }
+  }
+  if (phone) {
+    const existingPhone = db.prepare(
+      "SELECT id FROM users WHERE REPLACE(REPLACE(COALESCE(phone, ''), '-', ''), ' ', '') = ?"
+    ).get(phone);
+    if (existingPhone) {
+      return res.status(409).json({ error: 'Ese teléfono ya está asociado a otra cuenta.' });
+    }
   }
 
   // Generate new tenant_id = max(tenant_id) + 1
@@ -308,11 +516,11 @@ router.post('/auth/register', rateLimit('register', 3, 15 * 60 * 1000), async (r
   const pwHash = hashPassword(password);
   const empPwHash = hashPassword('empleado123');
 
-  // Create owner user
+  // Create owner user with email and phone for recovery
   const ownerResult = db.prepare(`
-    INSERT INTO users (username, password_hash, pin, role, display_name, tenant_id)
-    VALUES (?, ?, ?, 'dueno', ?, ?)
-  `).run(username, pwHash, password.slice(0, 6), `${businessName} (Dueño)`, newTenantId);
+    INSERT INTO users (username, password_hash, pin, role, display_name, tenant_id, email, phone)
+    VALUES (?, ?, ?, 'dueno', ?, ?, ?, ?)
+  `).run(username, pwHash, pin, `${businessName} (Dueño)`, newTenantId, email, phone);
 
   const ownerId = Number(ownerResult.lastInsertRowid);
 
@@ -452,7 +660,7 @@ router.post('/auth/reset-password', requireAuth, requireRole(['dueno']), (req: R
   res.json({ success: true, message: `Contraseña de ${target.display_name} restablecida.` });
 });
 
-router.post('/auth/change-password', rateLimit('password', 8, 15 * 60 * 1000), async (req: Request, res: Response) => {
+router.post('/auth/change-password', requireAuth, requireRole(['dueno']), rateLimit('password', 8, 15 * 60 * 1000), async (req: Request, res: Response) => {
   const humanError = await assertHuman(req);
   if (humanError) {
     return res.status(400).json({ error: humanError });
@@ -469,16 +677,21 @@ router.post('/auth/change-password', rateLimit('password', 8, 15 * 60 * 1000), a
     return res.status(400).json({ error: 'Es obligatorio ingresar la contraseña actual (antigua) para autorizar el cambio.' });
   }
 
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 4) {
-    return res.status(400).json({ error: 'La nueva contraseña / PIN debe tener al menos 4 caracteres.' });
+  if (!newPassword || typeof newPassword !== 'string' || !/^\d{4,6}$/.test(newPassword.trim())) {
+    return res.status(400).json({ error: 'El nuevo PIN debe contener entre 4 y 6 dígitos.' });
   }
 
   const cleanOld = oldPassword.trim();
   const cleanNew = newPassword.trim();
 
   // 2. Obtener usuarios de la base de datos
-  const targetUser = db.prepare('SELECT * FROM users WHERE role = ?').get(targetRole) as any;
-  const duenoUser = db.prepare("SELECT * FROM users WHERE role = 'dueno'").get() as any;
+  const tenantId = req.user!.tenantId;
+  const targetUser = db.prepare(
+    'SELECT * FROM users WHERE role = ? AND COALESCE(tenant_id, 1) = ?'
+  ).get(targetRole, tenantId) as any;
+  const duenoUser = db.prepare(
+    "SELECT * FROM users WHERE role = 'dueno' AND COALESCE(tenant_id, 1) = ?"
+  ).get(tenantId) as any;
 
   if (!targetUser) {
     return res.status(404).json({ error: 'El usuario especificado no existe.' });
@@ -498,8 +711,8 @@ router.post('/auth/change-password', rateLimit('password', 8, 15 * 60 * 1000), a
   db.prepare(`
     UPDATE users 
     SET pin = ?, password_hash = ?
-    WHERE role = ?
-  `).run(cleanNew, newHash, targetRole);
+    WHERE role = ? AND COALESCE(tenant_id, 1) = ?
+  `).run(cleanNew, newHash, targetRole, tenantId);
 
   res.json({
     success: true,
@@ -508,9 +721,43 @@ router.post('/auth/change-password', rateLimit('password', 8, 15 * 60 * 1000), a
 });
 
 // -------------------------------------------------------------
-// 2. Active Dates (Gestión dinámica de fechas: añadir y quitar)
+// 2. Secure Database Backups
 // -------------------------------------------------------------
-router.get('/dates', (req: Request, res: Response) => {
+router.get('/admin/backups', requireAuth, requireRole(['dueno']), (_req: Request, res: Response) => {
+  res.json(listDatabaseBackups());
+});
+
+router.post('/admin/backups', requireAuth, requireRole(['dueno']), (_req: Request, res: Response) => {
+  try {
+    const filePath = createDatabaseBackup();
+    writeAudit('create-backup', 'database', null, 'Respaldo SQLite creado manualmente', 'dueno');
+    res.json({ success: true, name: filePath.split(/[\\\\/]/).pop(), created: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'No se pudo crear el respaldo.' });
+  }
+});
+
+router.get('/admin/backups/:name', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const filePath = getBackupPath(req.params.name);
+  if (!filePath) return res.status(404).json({ error: 'Respaldo no encontrado.' });
+  res.download(filePath, req.params.name);
+});
+
+router.get('/admin/audit', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+  const rows = db.prepare(`
+    SELECT id, action, entity, entity_id, detail, user_role, created_at
+    FROM audit_log
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(limit) as any[];
+  res.json(rows);
+});
+
+// -------------------------------------------------------------
+// 3. Active Dates (Gestión dinámica de fechas: añadir y quitar)
+// -------------------------------------------------------------
+router.get('/dates', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const rows = db.prepare(
     'SELECT date FROM active_dates WHERE COALESCE(tenant_id, 1) = ? ORDER BY date DESC'
@@ -518,7 +765,7 @@ router.get('/dates', (req: Request, res: Response) => {
   res.json(rows.map(r => r.date));
 });
 
-router.post('/dates', (req: Request, res: Response) => {
+router.post('/dates', requireAuth, (req: Request, res: Response) => {
   const { date } = req.body;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: 'Formato de fecha inválido (debe ser AAAA-MM-DD).' });
@@ -739,7 +986,7 @@ function getCajaChicaCurrentBalance(tenantId: number): number {
 // -------------------------------------------------------------
 // 3. Movements (Ventas, Gastos, Servicios, etc.)
 // -------------------------------------------------------------
-router.get('/movements', (req: Request, res: Response) => {
+router.get('/movements', requireAuth, (req: Request, res: Response) => {
   const { date, search } = req.query;
   const tenantId = req.user?.tenantId ?? 1;
   let sql = `
@@ -863,7 +1110,10 @@ router.post('/movements', requireAuth, rateLimit('movements', 40, 60 * 1000), (r
         WHERE item_code = ? AND size = ? AND color = ? AND stock >= ? AND COALESCE(tenant_id, 1) = ?
       `);
       for (const it of items) {
-        const qty = Number(it.qty) || 1;
+        const qty = Number(it.qty);
+        if (!Number.isInteger(qty) || qty <= 0) {
+          throw new CashError(`Cantidad inválida para ${it.code} talla ${it.size}.`);
+        }
         const current = variant.get(it.code, it.size, it.color, tenantId) as { stock: number } | undefined;
         if (!current || current.stock < qty) {
           throw new CashError(`Stock insuficiente para ${it.code} talla ${it.size}.`);
@@ -871,6 +1121,24 @@ router.post('/movements', requireAuth, rateLimit('movements', 40, 60 * 1000), (r
         const updated = deductStock.run(qty, it.code, it.size, it.color, qty, tenantId);
         if (updated.changes !== 1) {
           throw new CashError(`No se pudo descontar el stock de ${it.code}.`);
+        }
+      }
+    }
+
+    if (type === 'compra' && Array.isArray(items) && items.length > 0) {
+      const addStock = db.prepare(`
+        UPDATE inventory_variants
+        SET stock = stock + ?
+        WHERE item_code = ? AND size = ? AND color = ? AND COALESCE(tenant_id, 1) = ?
+      `);
+      for (const it of items) {
+        const qty = Number(it.qty);
+        if (!Number.isInteger(qty) || qty <= 0) {
+          throw new CashError(`Cantidad inválida para ${it.code} talla ${it.size}.`);
+        }
+        const updated = addStock.run(qty, it.code, it.size, it.color, tenantId);
+        if (updated.changes !== 1) {
+          throw new CashError(`No existe la variante ${it.code} talla ${it.size} y color ${it.color}.`);
         }
       }
     }
@@ -922,13 +1190,30 @@ function voidMovementRecord(mov: any, role?: string) {
   }
   if (mov.type === 'venta' && mov.items_json) {
     const items = JSON.parse(mov.items_json);
+    const tenantId = mov.tenant_id ?? 1;
     const restoreStock = db.prepare(`
       UPDATE inventory_variants
       SET stock = stock + ?
-      WHERE item_code = ? AND size = ? AND color = ?
+      WHERE item_code = ? AND size = ? AND color = ? AND COALESCE(tenant_id, 1) = ?
     `);
     for (const it of items) {
-      restoreStock.run(Number(it.qty) || 1, it.code, it.size, it.color);
+      restoreStock.run(Number(it.qty) || 1, it.code, it.size, it.color, tenantId);
+    }
+  }
+  if (mov.type === 'compra' && mov.items_json) {
+    const items = JSON.parse(mov.items_json);
+    const tenantId = mov.tenant_id ?? 1;
+    const reversePurchase = db.prepare(`
+      UPDATE inventory_variants
+      SET stock = stock - ?
+      WHERE item_code = ? AND size = ? AND color = ? AND stock >= ? AND COALESCE(tenant_id, 1) = ?
+    `);
+    for (const it of items) {
+      const qty = Number(it.qty) || 1;
+      const updated = reversePurchase.run(qty, it.code, it.size, it.color, qty, tenantId);
+      if (updated.changes !== 1) {
+        throw new CashError(`No se puede revertir la compra de ${it.code}: stock insuficiente.`);
+      }
     }
   }
   if (mov.cc_id) {
@@ -937,6 +1222,33 @@ function voidMovementRecord(mov: any, role?: string) {
   db.prepare('UPDATE movements SET voided = 1 WHERE id = ?').run(mov.id);
   writeAudit('void-movement', 'movements', mov.id, mov.desc || mov.type, role);
 }
+
+router.get('/movements/:id/receipt', requireAuth, (req: Request, res: Response) => {
+  const tenantId = req.user!.tenantId;
+  const id = Number(req.params.id);
+  const movement = db.prepare(
+    'SELECT * FROM movements WHERE id = ? AND COALESCE(tenant_id, 1) = ? AND COALESCE(voided, 0) = 0'
+  ).get(id, tenantId) as any;
+  if (!movement) return res.status(404).json({ error: 'Movimiento no encontrado.' });
+
+  const amount = Number(movement.amount).toFixed(2);
+  const tax = Number(movement.tax).toFixed(2);
+  const itemRows = movement.items_json
+    ? (JSON.parse(movement.items_json) as any[]).map((item) =>
+        `<tr><td>${escapeHtml(item.code)}</td><td>${escapeHtml(item.size)} / ${escapeHtml(item.color)}</td><td>${escapeHtml(item.qty)}</td></tr>`
+      ).join('')
+    : '';
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comprobante ${escapeHtml(movement.voucher_code || movement.id)}</title>
+<style>@page{margin:12mm}body{font-family:Arial,sans-serif;color:#21342a;max-width:800px;margin:auto;padding:24px}h1{margin-bottom:4px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0}.box{border:1px solid #cbdcc5;border-radius:8px;padding:12px}.total{font-size:24px;font-weight:bold;text-align:right;margin-top:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left}@media print{button{display:none}}</style></head>
+<body><button onclick="window.print()">Imprimir / Guardar PDF</button><h1>Control Contable Pro</h1><small>Comprobante de operación</small>
+<div class="meta"><div class="box"><b>Correlativo</b><br>${escapeHtml(movement.voucher_code || `MOV-${movement.id}`)}</div><div class="box"><b>Fecha y hora</b><br>${escapeHtml(movement.date)} ${escapeHtml(movement.time)}</div></div>
+<div class="box"><b>Concepto</b><br>${escapeHtml(movement.desc)}<br><small>Tipo: ${escapeHtml(movement.type)} · Documento: ${escapeHtml(movement.doc)}</small></div>
+${itemRows ? `<table><thead><tr><th>Código</th><th>Variante</th><th>Cantidad</th></tr></thead><tbody>${itemRows}</tbody></table>` : ''}
+<div class="total">$${amount}</div><div style="text-align:right">IVA 13% incluido: $${tax}</div>
+</body></html>`);
+});
 
 router.delete('/movements/:id', requireAuth, requireRole(['dueno']), (req: Request, res: Response) => {
   const id = Number(req.params.id);
@@ -966,7 +1278,7 @@ router.delete('/movements/:id', requireAuth, requireRole(['dueno']), (req: Reque
 // -------------------------------------------------------------
 // 4. Inventory Module
 // -------------------------------------------------------------
-router.get('/inventory', (req: Request, res: Response) => {
+router.get('/inventory', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const items = db.prepare(
     'SELECT * FROM inventory_items WHERE COALESCE(tenant_id, 1) = ? ORDER BY code ASC'
@@ -1119,7 +1431,7 @@ router.delete('/inventory/:code', requireAuth, requireRole(['dueno']), (req: Req
 // -------------------------------------------------------------
 // 5. Caja Chica
 // -------------------------------------------------------------
-router.get('/caja-chica', (req: Request, res: Response) => {
+router.get('/caja-chica', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const rows = db.prepare(
     'SELECT * FROM caja_chica WHERE COALESCE(tenant_id, 1) = ? ORDER BY id DESC'
@@ -1257,7 +1569,7 @@ router.delete('/caja-chica/:id', requireAuth, requireRole(['dueno']), (req: Requ
 // 6. Cierre de Caja & Cierre de Inventario
 // -------------------------------------------------------------
 // 6a. Cierre de Caja
-router.get('/cierres/caja', (req: Request, res: Response) => {
+router.get('/cierres/caja', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const rows = db.prepare(
     'SELECT * FROM cierres_caja WHERE COALESCE(tenant_id, 1) = ? ORDER BY date DESC, id DESC'
@@ -1341,7 +1653,7 @@ router.delete('/cierres/caja/:id', requireAuth, requireRole(['dueno']), (req: Re
 });
 
 // 6b. Cierre de Inventario (Snapshots)
-router.get('/cierres/inventario', (req: Request, res: Response) => {
+router.get('/cierres/inventario', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const rows = db.prepare(
     'SELECT * FROM cierres_inventario WHERE COALESCE(tenant_id, 1) = ? ORDER BY date DESC, id DESC'
@@ -1402,7 +1714,7 @@ router.delete('/cierres/inventario/:id', requireAuth, requireRole(['dueno']), (r
 // -------------------------------------------------------------
 // 7. Apartados
 // -------------------------------------------------------------
-router.get('/apartados', (req: Request, res: Response) => {
+router.get('/apartados', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const rows = db.prepare(
     'SELECT * FROM apartados WHERE COALESCE(tenant_id, 1) = ? ORDER BY id DESC'
@@ -1415,23 +1727,27 @@ router.get('/apartados', (req: Request, res: Response) => {
     abono: r.abono,
     status: r.status,
     date: r.date,
-    time: r.time
+    time: r.time,
+    dueDate: r.due_date || null
   })));
 });
 
 router.post('/apartados', requireAuth, (req: Request, res: Response) => {
-  const { clientName, prendaDesc, total, abono, date, time } = req.body;
+  const { clientName, prendaDesc, total, abono, date, time, dueDate } = req.body;
   const tot = Number(total);
   const ab = Number(abono);
 
   if (!clientName || !prendaDesc || !(tot > 0) || !(ab >= 0)) {
     return res.status(400).json({ error: 'Datos de cliente, prenda o montos inválidos.' });
   }
+  if (ab > tot) {
+    return res.status(400).json({ error: 'El abono inicial no puede ser mayor al total del apartado.' });
+  }
 
   const tenantId = req.user!.tenantId;
   const stmt = db.prepare(`
-    INSERT INTO apartados (client_name, prenda_desc, total, abono, status, date, time, tenant_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO apartados (client_name, prenda_desc, total, abono, status, date, time, tenant_id, due_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
@@ -1442,7 +1758,8 @@ router.post('/apartados', requireAuth, (req: Request, res: Response) => {
     ab >= tot ? 'entregado' : 'apartado',
     date || new Date().toISOString().slice(0, 10),
     time || (new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
-    tenantId
+    tenantId,
+    typeof dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? dueDate : null
   );
 
   res.json({ success: true, id: result.lastInsertRowid });
@@ -1461,8 +1778,15 @@ router.put('/apartados/:id/abono', requireAuth, (req: Request, res: Response) =>
   }
 
   let newAbono = ap.abono;
-  if (extraAbono) {
-    newAbono += Number(extraAbono);
+  if (extraAbono !== undefined && extraAbono !== null && extraAbono !== '') {
+    const extra = Number(extraAbono);
+    if (!Number.isFinite(extra) || extra <= 0) {
+      return res.status(400).json({ error: 'El abono adicional debe ser mayor a cero.' });
+    }
+    newAbono += extra;
+  }
+  if (newAbono > ap.total && !markDelivered) {
+    return res.status(400).json({ error: 'El abono acumulado no puede exceder el total.' });
   }
   let newStatus = ap.status;
   if (markDelivered || newAbono >= ap.total) {
@@ -1494,7 +1818,7 @@ router.delete('/apartados/:id', requireAuth, requireRole(['dueno']), (req: Reque
 // -------------------------------------------------------------
 // 8. Calendar
 // -------------------------------------------------------------
-router.get('/calendar', (req: Request, res: Response) => {
+router.get('/calendar', requireAuth, (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId ?? 1;
   const rows = db.prepare(
     'SELECT * FROM calendar_days WHERE COALESCE(tenant_id, 1) = ?'
@@ -1548,9 +1872,55 @@ router.put('/calendar/:date', requireAuth, (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
-// 9. Balance & Reports (With Role Check for Sensitive Margins)
+// 9. Operational Alerts
 // -------------------------------------------------------------
-router.get('/reports/summary', (req: Request, res: Response) => {
+router.get('/alerts', requireAuth, (req: Request, res: Response) => {
+  const tenantId = req.user!.tenantId;
+  const lowStock = db.prepare(`
+    SELECT iv.item_code, iv.size, iv.color, iv.stock, ii.name
+    FROM inventory_variants iv
+    JOIN inventory_items ii
+      ON ii.code = iv.item_code AND ii.tenant_id = iv.tenant_id
+    WHERE iv.stock <= 3
+      AND COALESCE(iv.tenant_id, 1) = ?
+    ORDER BY iv.stock ASC, ii.name ASC
+  `).all(tenantId) as any[];
+
+  const today = new Date().toISOString().slice(0, 10);
+  const overdueApartados = db.prepare(`
+    SELECT id, client_name, prenda_desc, due_date, total, abono
+    FROM apartados
+    WHERE status = 'apartado'
+      AND due_date IS NOT NULL
+      AND due_date < ?
+      AND COALESCE(tenant_id, 1) = ?
+    ORDER BY due_date ASC
+  `).all(today, tenantId) as any[];
+
+  res.json({
+    lowStock: lowStock.map((item) => ({
+      code: item.item_code,
+      name: item.name,
+      size: item.size,
+      color: item.color,
+      stock: item.stock,
+    })),
+    overdueApartados: overdueApartados.map((item) => ({
+      id: item.id,
+      clientName: item.client_name,
+      prendaDesc: item.prenda_desc,
+      dueDate: item.due_date,
+      total: item.total,
+      abono: item.abono,
+      balance: Math.max(0, Number(item.total) - Number(item.abono)),
+    })),
+  });
+});
+
+// -------------------------------------------------------------
+// 10. Balance & Reports (With Role Check for Sensitive Margins)
+// -------------------------------------------------------------
+router.get('/reports/summary', requireAuth, (req: Request, res: Response) => {
   const { date } = req.query;
   const isDueno = req.user?.role === 'dueno';
   const tenantId = req.user?.tenantId ?? 1;

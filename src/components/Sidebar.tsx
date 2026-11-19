@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActiveModule } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useDevice } from '../context/DeviceContext';
 
 interface SidebarProps {
   activeModule: ActiveModule;
@@ -9,11 +10,19 @@ interface SidebarProps {
 
 export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
   const { isOwner } = useAuth();
+  const { isMobile: isMobileDevice } = useDevice();
 
   return (
-    <aside className="modules-sidebar-right" aria-label="Navegación de Módulos">
-      <div className="sidebar-panel-card">
-        <div className="sidebar-header">
+    <aside
+      className="modules-sidebar-right"
+      aria-label="Navegación de Módulos"
+      style={{
+        width: '100%',
+        maxWidth: isMobileDevice ? '100%' : undefined,
+      }}
+    >
+      <div className="sidebar-panel-card" style={{ padding: isMobileDevice ? '12px' : '16px' }}>
+        <div className="sidebar-header" style={{ marginBottom: isMobileDevice ? '10px' : '14px' }}>
           <div className="sidebar-brand-badge">
             <svg
               className="sidebar-brand-icon"
@@ -30,19 +39,32 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
               <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
               <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
             </svg>
-            <span>MÓDULOS DEL SISTEMA</span>
+            <span style={{ letterSpacing: '0.04em' }}>MÓDULOS DEL SISTEMA</span>
           </div>
-          <h2 className="sidebar-title">Panel de Control</h2>
-          <p className="sidebar-subtitle">Gestión Contable & Operativa</p>
+          <h2 className="sidebar-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Panel de Control
+          </h2>
+          <p className="sidebar-subtitle" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Gestión Contable & Operativa
+          </p>
         </div>
 
-        <nav className="main-modules" aria-label="Módulos del Sistema">
+        <nav
+          className="main-modules"
+          aria-label="Módulos del Sistema"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobileDevice ? 'repeat(auto-fill, minmax(140px, 1fr))' : '1fr',
+            gap: isMobileDevice ? '6px' : '8px',
+          }}
+        >
           {/* F1: Contable */}
           <button
             type="button"
             className={`module-btn ${activeModule === 'contable' ? 'active' : ''}`}
             onClick={() => onSelectModule('contable')}
             title="Ventas, Facturación y Caja"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F1</span>
             <span className="module-icon-box icon-sales" aria-hidden="true">
@@ -53,9 +75,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="M7 17v3a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Ventas y Caja</span>
-              <span className="module-desc">POS, IVA y Movimientos</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Ventas y Caja
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                POS, IVA y Movimientos
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -66,6 +92,7 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             className={`module-btn ${activeModule === 'inventario' ? 'active' : ''}`}
             onClick={() => onSelectModule('inventario')}
             title="Inventario, Tallas y Stock"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F2</span>
             <span className="module-icon-box icon-inventory" aria-hidden="true">
@@ -76,9 +103,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="M12 22V12"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Inventario</span>
-              <span className="module-desc">Tallas, Stock y Costos</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Inventario
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Tallas, Stock y Costos
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -89,6 +120,7 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             className={`module-btn ${activeModule === 'apartados' ? 'active' : ''}`}
             onClick={() => onSelectModule('apartados')}
             title="Apartados y Abonos de Clientes"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F3</span>
             <span className="module-icon-box icon-apartados" aria-hidden="true">
@@ -97,9 +129,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="M7 15h0M2 9.5h20"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Apartados</span>
-              <span className="module-desc">Reservas y Abonos</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Apartados
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Reservas y Abonos
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -110,6 +146,7 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             className={`module-btn ${activeModule === 'cajaChica' ? 'active' : ''}`}
             onClick={() => onSelectModule('cajaChica')}
             title="Fondo para gastos menores diarios"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F4</span>
             <span className="module-icon-box icon-caja-chica" aria-hidden="true">
@@ -119,9 +156,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="M6 12h.01M18 12h.01"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Caja Chica</span>
-              <span className="module-desc">Fondo y Gastos Menores</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Caja Chica
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Fondo y Gastos Menores
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -132,6 +173,7 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             className={`module-btn ${activeModule === 'reportes' ? 'active' : ''}`}
             onClick={() => onSelectModule('reportes')}
             title="Balance consolidado y análisis financiero"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F5</span>
             <span className="module-icon-box icon-reports" aria-hidden="true">
@@ -140,9 +182,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="m19 9-5 5-4-4-3 3"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Reportes</span>
-              <span className="module-desc">Balance y Exportación</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Reportes
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Balance y Exportación
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -153,6 +199,7 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             className={`module-btn ${activeModule === 'cierre' ? 'active' : ''}`}
             onClick={() => onSelectModule('cierre')}
             title="Arqueo de caja física y cierre de inventario valorizado"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F6</span>
             <span className="module-icon-box icon-cierre" aria-hidden="true">
@@ -161,9 +208,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="M12 7v5l3 3"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Cierres y Arqueo</span>
-              <span className="module-desc">Caja & Snapshots</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Cierres y Arqueo
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Caja & Snapshots
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -174,6 +225,7 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
             className={`module-btn ${activeModule === 'calendario' ? 'active' : ''}`}
             onClick={() => onSelectModule('calendario')}
             title="Jornadas, asuetos y días sin ventas"
+            style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
             <span className="module-key-code">F7</span>
             <span className="module-icon-box icon-calendar" aria-hidden="true">
@@ -182,9 +234,13 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                 <path d="M3 10h18M8 3v4M16 3v4"></path>
               </svg>
             </span>
-            <span className="module-info">
-              <span className="module-name">Calendario</span>
-              <span className="module-desc">Jornadas y Asuetos</span>
+            <span className="module-info" style={{ minWidth: 0 }}>
+              <span className="module-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Calendario
+              </span>
+              <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Jornadas y Asuetos
+              </span>
             </span>
             <span className="module-indicator" aria-hidden="true"></span>
           </button>
@@ -197,9 +253,10 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
               onClick={() => onSelectModule('admin')}
               title="Gestión de Cajas, Usuarios y Permisos"
               style={{
-                marginTop: '8px',
+                marginTop: isMobileDevice ? '2px' : '8px',
                 borderTop: '1px dashed var(--border)',
                 paddingTop: '10px',
+                minHeight: isMobileDevice ? '52px' : '46px',
               }}
             >
               <span className="module-key-code" style={{ fontSize: '0.65rem', padding: '2px 4px' }}>ADM</span>
@@ -209,16 +266,20 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
               </span>
-              <span className="module-info">
-                <span className="module-name" style={{ color: 'var(--primary)', fontWeight: 700 }}>Administración</span>
-                <span className="module-desc">Cajas & Usuarios</span>
+              <span className="module-info" style={{ minWidth: 0 }}>
+                <span className="module-name" style={{ color: 'var(--primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Administración
+                </span>
+                <span className="module-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Cajas & Usuarios
+                </span>
               </span>
               <span className="module-indicator" aria-hidden="true"></span>
             </button>
           )}
         </nav>
 
-        <div className="sidebar-footer-info">
+        <div className="sidebar-footer-info" style={{ marginTop: isMobileDevice ? '10px' : '16px' }}>
           <div className="system-status-pill">
             <span className="pulse-dot"></span>
             <span className="status-name">Sistema Operativo</span>
@@ -229,4 +290,5 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
     </aside>
   );
 }
+
 export default Sidebar;

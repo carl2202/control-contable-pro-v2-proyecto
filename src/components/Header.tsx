@@ -9,6 +9,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFeedback } from '../context/FeedbackContext';
+import { DeviceSwitcher } from '../context/DeviceContext';
 import DarkModeToggle from './DarkModeToggle';
 import SyncIndicator from './SyncIndicator';
 
@@ -75,6 +76,9 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
 
           {/* Interruptor de modo oscuro corporativo */}
           <DarkModeToggle />
+
+          {/* Selector de dispositivo (Computadora / Teléfono) */}
+          <DeviceSwitcher compact />
         </div>
 
         {/* Título principal con ícono SVG de tienda */}

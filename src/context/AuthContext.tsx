@@ -33,9 +33,11 @@ interface AuthContextType {
   /** Atajo: true si el usuario tiene rol 'empleado'. */
   isEmployee: boolean;
   /** Autentica con un PIN y un rol; devuelve {success, error?}. */
-  loginWithPin: (pin: string, role?: Role) => Promise<{ success: boolean; error?: string }>;
+  loginWithPin: (pin: string, role?: Role, username?: string) => Promise<{ success: boolean; error?: string }>;
+  /** Autentica sin contraseña mediante código OTP por correo o teléfono. */
+  loginWithOtp: (target: string, code: string) => Promise<{ success: boolean; error?: string }>;
   /** Registra un nuevo negocio y usuario dueño en la nube con aislamiento de datos. */
-  registerUser: (data: { username: string; password: string; businessName: string }) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (data: { username: string; password: string; pin: string; businessName: string; email?: string; phone?: string }) => Promise<{ success: boolean; error?: string }>;
   /** Cierra la sesión actual limpiando token y usuario. */
   logout: () => Promise<void>;
   /** Refresca los datos del usuario desde el servidor. */
@@ -100,10 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Si es exitoso actualiza user y token; si falla devuelve el error.
   const loginWithPin = async (
     pin: string,
-    role?: Role
+    role?: Role,
+    username?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const data = await AuthService.login({ pin, role });
+      const data = await AuthService.login({ pin, role, username });
       setUser(data.user);
       setToken(data.token);
       return { success: true };
@@ -115,11 +118,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ── loginWithOtp ───────────────────────────────────────────
+  const loginWithOtp = async (
+    target: string,
+    code: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const data = await AuthService.verifyOtp(target, code);
+      setUser(data.user);
+      setToken(data.token);
+      return { success: true };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.message || 'Código de verificación incorrecto o expirado.',
+      };
+    }
+  };
+
   // ── registerUser ───────────────────────────────────────────
   const registerUser = async (data: {
     username: string;
     password: string;
+    pin: string;
     businessName: string;
+    email?: string;
+    phone?: string;
   }): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await AuthService.register(data);
@@ -148,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, isOwner, isEmployee, loginWithPin, registerUser, logout, refreshUser }}
+      value={{ user, token, loading, isOwner, isEmployee, loginWithPin, loginWithOtp, registerUser, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

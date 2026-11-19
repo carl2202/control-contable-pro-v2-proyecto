@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { router as apiRouter, authMiddleware } from './server/routes.js';
+import { startAutomaticBackups } from './server/backup.js';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 async function startServer() {
+  startAutomaticBackups();
   if (!isProd) {
     // Development mode with Vite middleware
     const { createServer: createViteServer } = await import('vite');

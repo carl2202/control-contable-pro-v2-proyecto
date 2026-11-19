@@ -20,6 +20,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
   const [prendaDesc, setPrendaDesc] = useState<string>('');
   const [totalAmount, setTotalAmount] = useState<string>('');
   const [initialAbono, setInitialAbono] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
   const [selectedInvCode, setSelectedInvCode] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -79,17 +80,17 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
     const ab = parseFloat(initialAbono);
 
     if (!cleanClient || !cleanDesc) {
-      showToast('⚠️ Ingresa el nombre del cliente y la prenda.', true);
+      showToast('Ingresa el nombre del cliente y la prenda.', true);
       return;
     }
 
     if (isNaN(tot) || tot <= 0) {
-      showToast('⚠️ El monto total debe ser mayor a 0.', true);
+      showToast('El monto total debe ser mayor a 0.', true);
       return;
     }
 
     if (isNaN(ab) || ab < 0) {
-      showToast('⚠️ El abono inicial no puede ser negativo.', true);
+      showToast('El abono inicial no puede ser negativo.', true);
       return;
     }
 
@@ -99,13 +100,15 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
         prendaDesc: cleanDesc,
         total: tot,
         abono: ab,
+        dueDate: dueDate || undefined,
       });
 
-      showToast(`✅ Apartado de ${cleanClient} registrado con éxito.`);
+      showToast(`Apartado de ${cleanClient} registrado con éxito.`, false, 'success');
       setClientName('');
       setPrendaDesc('');
       setTotalAmount('');
       setInitialAbono('');
+      setDueDate('');
       setSelectedInvCode('');
       loadData();
       if (onRefreshData) onRefreshData();
@@ -132,13 +135,13 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
 
     const extra = parseFloat(extraAbono) || 0;
     if (extra <= 0 && !markDelivered) {
-      showToast('⚠️ Ingrese un monto de abono mayor a 0 o marque como entregado.', true);
+      showToast('Ingrese un monto de abono mayor a 0 o marque como entregado.', true);
       return;
     }
 
     try {
       await ApartadosService.addAbono(apartado.id, extra, markDelivered);
-      showToast(`✅ Abono registrado para ${apartado.clientName}.`);
+      showToast(`Abono registrado para ${apartado.clientName}.`, false, 'success');
       setAbonoModalState({ isOpen: false, apartado: null, extraAbono: '', markDelivered: false });
       loadData();
       if (onRefreshData) onRefreshData();
@@ -150,7 +153,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
   // Delete Apartado
   const handleDeleteApartado = async (ap: Apartado) => {
     if (!isOwner) {
-      showToast('⚠️ Solo el Dueño / Administrador puede eliminar apartados.', true);
+      showToast('Solo el Dueño / Administrador puede eliminar apartados.', true);
       return;
     }
 
@@ -339,6 +342,18 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
               </div>
             </div>
 
+            <div className="form-group">
+              <label className="text-xs font-semibold text-[#46524A] block mb-1">
+                Fecha límite (opcional):
+              </label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full text-xs p-2 rounded-md bg-[#F7F8F3] border border-[#D7DDCF] text-[#2F3A33] focus:border-[#4F6F52] outline-none"
+              />
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary w-full py-2 font-semibold text-xs"
@@ -362,7 +377,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
             </h3>
             <input
               type="text"
-              placeholder="🔍 Buscar cliente / prenda..."
+              placeholder="Buscar cliente / prenda..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="text-xs p-1.5 rounded-md bg-[#F7F8F3] border border-[#D7DDCF] text-[#2F3A33] focus:border-[#4F6F52] outline-none w-48"
@@ -374,6 +389,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
               <thead>
                 <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                   <th className="p-2.5">Fecha</th>
+                  <th className="p-2.5">Vence</th>
                   <th className="p-2.5">Cliente</th>
                   <th className="p-2.5">Prenda</th>
                   <th className="p-2.5 text-right">Total ($)</th>
@@ -386,7 +402,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
               <tbody>
                 {filteredApartados.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-4 text-center text-[#6F7B72]">
+                    <td colSpan={9} className="p-4 text-center text-[#6F7B72]">
                       No hay apartados registrados con los filtros seleccionados.
                     </td>
                   </tr>
@@ -394,11 +410,17 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                   filteredApartados.map((ap) => {
                     const saldo = Math.max(0, ap.total - ap.abono);
                     const isDelivered = ap.status === 'entregado';
+                    const due = ap.dueDate ? new Date(`${ap.dueDate}T23:59:59`) : null;
+                    const isOverdue = !isDelivered && !!due && due.getTime() < Date.now();
                     return (
                       <tr key={ap.id} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
                         <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                           {ap.date}
                           <span className="block text-[10px] text-[#9AA59C]">{ap.time}</span>
+                        </td>
+                        <td className={`p-2.5 whitespace-nowrap ${isOverdue ? 'text-[#B2603F] font-bold' : 'text-[#6F7B72]'}`}>
+                          {ap.dueDate || '-'}
+                          {isOverdue && <span className="block text-[10px]">VENCIDO</span>}
                         </td>
                         <td className="p-2.5 font-semibold text-[#2F3A33]">{ap.clientName}</td>
                         <td className="p-2.5 text-[#46524A]">{ap.prendaDesc}</td>
@@ -418,10 +440,10 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                         <td className="p-2.5 text-center whitespace-nowrap">
                           <span
                             className={`badge ${
-                              isDelivered ? 'badge-pagado' : 'badge-cajachica'
+                              isDelivered ? 'badge-pagado' : isOverdue ? 'badge-egreso' : 'badge-cajachica'
                             }`}
                           >
-                            {isDelivered ? 'ENTREGADO' : 'APARTADO'}
+                            {isDelivered ? 'ENTREGADO' : isOverdue ? 'VENCIDO' : 'APARTADO'}
                           </span>
                         </td>
                         <td className="p-2.5 text-center whitespace-nowrap">

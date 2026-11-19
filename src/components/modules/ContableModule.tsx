@@ -268,10 +268,10 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
       finalAmount = amt;
 
       const trimmedDesc = customDesc.trim();
-      if (opType === 'luz') descFinal = `💡 [Pago de Luz] ${trimmedDesc || 'Servicio de Energía'}`;
-      else if (opType === 'agua') descFinal = `🚰 [Pago de Agua] ${trimmedDesc || 'Servicio de Agua Potable'}`;
-      else if (opType === 'internet') descFinal = `📶 [Pago de Internet/Tel] ${trimmedDesc || 'Servicio de Telecomunicaciones'}`;
-      else if (opType === 'compra') descFinal = `🛍️ [Compra Mercadería] ${trimmedDesc || 'Adquisición de prendas'}`;
+      if (opType === 'luz') descFinal = `[Pago de Luz] ${trimmedDesc || 'Servicio de Energía'}`;
+      else if (opType === 'agua') descFinal = `[Pago de Agua] ${trimmedDesc || 'Servicio de Agua Potable'}`;
+      else if (opType === 'internet') descFinal = `[Pago de Internet/Tel] ${trimmedDesc || 'Servicio de Telecomunicaciones'}`;
+      else if (opType === 'compra') descFinal = `[Compra Mercadería] ${trimmedDesc || 'Adquisición de prendas'}`;
       else descFinal = trimmedDesc || 'Movimiento contable';
     }
 
@@ -294,8 +294,8 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
 
       showToast(
         res.voucherCode
-          ? `✅ Operación guardada con Vale Interno #${res.voucherCode}`
-          : '✅ Operación guardada con éxito.',
+          ? `Operación guardada con Vale Interno #${res.voucherCode}`
+          : 'Operación guardada con éxito.',
         false,
         'success'
       );
@@ -326,6 +326,24 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
       showToast(err.message || 'Error al guardar la operación.', true);
+    }
+  };
+
+  const handlePrintReceipt = async (mov: Movement) => {
+    try {
+      const token = localStorage.getItem('contable_token');
+      const response = await fetch(`/api/movements/${mov.id}/receipt`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('No se pudo generar el comprobante.');
+      const html = await response.text();
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!printWindow) showToast('El navegador bloqueó la ventana del comprobante.', true);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      showToast(err.message || 'No se pudo generar el comprobante.', true);
     }
   };
 
@@ -451,9 +469,9 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
             }`}
           >
             <span>
-              {currentDayInfo.status === 'laborado' && '🟢 Jornada Laborada'}
-              {currentDayInfo.status === 'asueto' && '🔵 Asueto / Feriado'}
-              {currentDayInfo.status === 'sinventas' && '🟡 Sin Ventas'}
+              {currentDayInfo.status === 'laborado' && 'Jornada Laborada'}
+              {currentDayInfo.status === 'asueto' && 'Asueto / Feriado'}
+              {currentDayInfo.status === 'sinventas' && 'Sin Ventas'}
             </span>
             {currentDayInfo.note && <span className="opacity-75">({currentDayInfo.note})</span>}
           </div>
@@ -463,7 +481,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
         <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="🔍 Buscar en historial..."
+            placeholder="Buscar en historial..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ width: '220px' }}
@@ -720,9 +738,9 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                               <span className="text-[#6F7B72]">({v.color})</span>
                               <div className="text-[11px] mt-0.5">
                                 {isOut ? (
-                                  <span className="text-[#B2603F] font-bold">🔴 Agotado</span>
+                                  <span className="text-[#B2603F] font-bold">Agotado</span>
                                 ) : isLow ? (
-                                  <span className="text-[#B58A3C] font-semibold">⚠️ ¡Poco stock ({v.stock})!</span>
+                                  <span className="text-[#B58A3C] font-semibold">Bajo stock ({v.stock})</span>
                                 ) : (
                                   <span className="text-[#4F6F52] font-medium">Stock: {v.stock} un.</span>
                                 )}
@@ -776,12 +794,12 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                   onChange={(e) => setCcCategory(e.target.value)}
                   className="w-full text-xs p-2 rounded-md bg-[#F7F8F3] border border-[#D7DDCF] text-[#2F3A33] focus:border-[#4F6F52] outline-none"
                 >
-                  <option value="Alimentación y Refrigerios">🍔 Alimentación y Refrigerios</option>
-                  <option value="Papelería y Útiles de Oficina">📁 Papelería y Útiles de Oficina</option>
-                  <option value="Artículos de Limpieza y Aseo">🧹 Artículos de Limpieza y Aseo</option>
-                  <option value="Mensajería y Envíos Locales">🛵 Mensajería y Envíos Locales</option>
-                  <option value="Transporte y Combustible">⛽ Transporte y Combustible</option>
-                  <option value="Otros Gastos Operativos Menores">📦 Otros Gastos Operativos Menores</option>
+                  <option value="Alimentación y Refrigerios">Alimentación y Refrigerios</option>
+                  <option value="Papelería y Útiles de Oficina">Papelería y Útiles de Oficina</option>
+                  <option value="Artículos de Limpieza y Aseo">Artículos de Limpieza y Aseo</option>
+                  <option value="Mensajería y Envíos Locales">Mensajería y Envíos Locales</option>
+                  <option value="Transporte y Combustible">Transporte y Combustible</option>
+                  <option value="Otros Gastos Operativos Menores">Otros Gastos Operativos Menores</option>
                 </select>
               </div>
             )}
@@ -975,6 +993,14 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                           ${(m.tax || 0).toFixed(2)}
                         </td>
                         <td className="p-2.5 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            className="btn btn-light btn-table-action text-[11px] px-2 py-0.5 mr-1"
+                            onClick={() => handlePrintReceipt(m)}
+                            title="Imprimir o guardar comprobante en PDF"
+                          >
+                            PDF
+                          </button>
                           {isVoided ? (
                             <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-700 border border-red-200">
                               Anulado

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: control-contable-pro
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_OTP
+        value: true
+      - key: AUTO_BACKUP
+        value: true
+      - key: AUTO_BACKUP_INTERVAL_HOURS
+        value: 24
+      - key: SESSION_SECRET
+        generateValue: true

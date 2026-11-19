@@ -5,6 +5,27 @@ import { useAuth } from '../../context/AuthContext';
 import { useFeedback } from '../../context/FeedbackContext';
 import { MetricCard } from '../MetricCard';
 
+/** Icono SVG moderno según categoría de Caja Chica */
+function CategoryIcon({ category, size = 14 }: { category: string; size?: number }) {
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  switch (category) {
+    case 'Alimentación y Refrigerios':
+      return <svg {...props}><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>;
+    case 'Papelería y Útiles de Oficina':
+      return <svg {...props}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a1 1 0 0 0 1 1h3"/><path d="M10 13h4"/><path d="M10 17h4"/></svg>;
+    case 'Artículos de Limpieza y Aseo':
+      return <svg {...props}><path d="m12 3-1.9 12.2a1 1 0 0 0 1 1.1h1.8a1 1 0 0 0 1-1.1L12 3Z"/><path d="M6.6 18.4a2 2 0 0 0 1.4.6h8a2 2 0 0 0 1.4-.6l2-2a1 1 0 0 0 0-1.4l-1-1a1 1 0 0 0-1.4 0L16 15l-1-1-1 1-1-1-1 1-1-1L9.4 15a1 1 0 0 0-1.4 0l-1 1a1 1 0 0 0 0 1.4Z"/></svg>;
+    case 'Mensajería y Envíos Locales':
+      return <svg {...props}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>;
+    case 'Transporte y Combustible':
+      return <svg {...props}><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C1.4 11.3 1 12.1 1 13v3c0 .6.4 1 1 1h1"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>;
+    case 'Inyección de Fondo':
+      return <svg {...props}><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>;
+    default: // Otros Gastos Operativos Menores
+      return <svg {...props}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>;
+  }
+}
+
 interface CajaChicaModuleProps {
   onRefreshData?: () => void;
 }
@@ -47,12 +68,12 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
     e.preventDefault();
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) {
-      showToast('⚠️ Ingresa un monto válido mayor a 0.', true);
+      showToast('Ingresa un monto válido mayor a 0.', true);
       return;
     }
 
     if (opType === 'gasto' && amt - summary.balance > 0.005) {
-      showToast(`⚠️ Saldo insuficiente en Caja Chica. Saldo disponible: $${summary.balance.toFixed(2)}`, true);
+      showToast(`Saldo insuficiente en Caja Chica. Saldo disponible: $${summary.balance.toFixed(2)}`, true);
       return;
     }
 
@@ -64,7 +85,7 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
         amount: amt,
       });
 
-      showToast(`✅ Movimiento de Caja Chica registrado con éxito.`);
+      showToast(`Movimiento de Caja Chica registrado con éxito.`);
       setDesc('');
       setAmount('');
       loadCajaChica();
@@ -77,7 +98,7 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
   // Delete Movement
   const handleDeleteMovement = async (id: number) => {
     if (!isOwner) {
-      showToast('⚠️ Solo el Dueño / Administrador puede eliminar registros de caja chica.', true);
+      showToast('Solo el Dueño / Administrador puede eliminar registros de caja chica.', true);
       return;
     }
 
@@ -156,24 +177,32 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
                 <button
                   type="button"
                   onClick={() => setOpType('gasto')}
-                  className={`p-2.5 rounded-lg text-xs font-semibold border transition-all ${
+                  className={`p-2.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-2 ${
                     opType === 'gasto'
-                      ? 'border-[#B2603F] bg-[#F8EBE4] text-[#7E3F27] shadow-xs'
-                      : 'border-[#D7DDCF] bg-[#F7F8F3] text-[#6F7B72] hover:bg-[#EEF1E8]'
+                      ? 'border-[#B2603F] bg-[#B2603F] text-white shadow-sm'
+                      : 'border-[#D7DDCF] bg-[#F7F8F3] text-[#46524A] hover:bg-[#EEF1E8]'
                   }`}
                 >
-                  🔴 Gasto / Egreso Menor
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <polyline points="19 12 12 19 5 12" />
+                  </svg>
+                  Gasto / Egreso Menor
                 </button>
                 <button
                   type="button"
                   onClick={() => setOpType('ingreso')}
-                  className={`p-2.5 rounded-lg text-xs font-semibold border transition-all ${
+                  className={`p-2.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-2 ${
                     opType === 'ingreso'
-                      ? 'border-[#4F6F52] bg-[#E1EBDC] text-[#2F4A38] shadow-xs'
-                      : 'border-[#D7DDCF] bg-[#F7F8F3] text-[#6F7B72] hover:bg-[#EEF1E8]'
+                      ? 'border-[#4F6F52] bg-[#4F6F52] text-white shadow-sm'
+                      : 'border-[#D7DDCF] bg-[#F7F8F3] text-[#46524A] hover:bg-[#EEF1E8]'
                   }`}
                 >
-                  🟢 Inyección / Carga de Fondo
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                  Inyección de Fondo
                 </button>
               </div>
             </div>
@@ -183,18 +212,23 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
                 <label className="text-xs font-semibold text-[#46524A] block mb-1">
                   Categoría del Gasto:
                 </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full text-xs p-2 rounded-md bg-[#F7F8F3] border border-[#D7DDCF] text-[#2F3A33] focus:border-[#4F6F52] outline-none"
-                >
-                  <option value="Alimentación y Refrigerios">🍔 Alimentación y Refrigerios</option>
-                  <option value="Papelería y Útiles de Oficina">📁 Papelería y Útiles de Oficina</option>
-                  <option value="Artículos de Limpieza y Aseo">🧹 Artículos de Limpieza y Aseo</option>
-                  <option value="Mensajería y Envíos Locales">🛵 Mensajería y Envíos Locales</option>
-                  <option value="Transporte y Combustible">⛽ Transporte y Combustible</option>
-                  <option value="Otros Gastos Operativos Menores">📦 Otros Gastos Operativos Menores</option>
-                </select>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#4F6F52] pointer-events-none">
+                    <CategoryIcon category={category} size={15} />
+                  </span>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full text-xs p-2 pl-9 rounded-md bg-[#F7F8F3] border border-[#D7DDCF] text-[#2F3A33] focus:border-[#4F6F52] outline-none"
+                  >
+                    <option value="Alimentación y Refrigerios">Alimentación y Refrigerios</option>
+                    <option value="Papelería y Útiles de Oficina">Papelería y Útiles de Oficina</option>
+                    <option value="Artículos de Limpieza y Aseo">Artículos de Limpieza y Aseo</option>
+                    <option value="Mensajería y Envíos Locales">Mensajería y Envíos Locales</option>
+                    <option value="Transporte y Combustible">Transporte y Combustible</option>
+                    <option value="Otros Gastos Operativos Menores">Otros Gastos Operativos Menores</option>
+                  </select>
+                </div>
               </div>
             )}
 
@@ -291,7 +325,10 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
                           </span>
                         </td>
                         <td className="p-2.5 whitespace-nowrap text-[#46524A]">
-                          <span className="badge badge-cat text-[10px]">{m.category}</span>
+                          <span className="badge badge-cat text-[10px] inline-flex items-center gap-1.5">
+                            <span className="text-[#4F6F52]"><CategoryIcon category={m.category} size={13} /></span>
+                            {m.category}
+                          </span>
                         </td>
                         <td className="p-2.5 text-[#2F3A33] font-medium">{m.desc}</td>
                         <td

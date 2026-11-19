@@ -167,6 +167,17 @@ db.exec(`
     user_role TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS otp_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target TEXT NOT NULL,
+    code TEXT NOT NULL,
+    user_id INTEGER,
+    expires_at INTEGER NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    tenant_id INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 function tableHasColumn(table: string, column: string): boolean {
@@ -188,6 +199,16 @@ ensureColumn('movements', 'voided', 'voided INTEGER NOT NULL DEFAULT 0');
 ensureColumn('caja_chica', 'register_id', 'register_id INTEGER');
 ensureColumn('caja_chica', 'voided', 'voided INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', 'active', 'active INTEGER NOT NULL DEFAULT 1');
+ensureColumn('users', 'email', 'email TEXT');
+ensureColumn('users', 'phone', 'phone TEXT');
+
+// Ensure default contact info for existing seeds
+try {
+  db.prepare("UPDATE users SET email = 'admin@tienda.com', phone = '70001122' WHERE role = 'dueno' AND (email IS NULL OR email = '')").run();
+  db.prepare("UPDATE users SET email = 'cajero@tienda.com', phone = '71112233' WHERE role = 'empleado' AND (email IS NULL OR email = '')").run();
+} catch {
+  // Silent fallback if table not yet initialized
+}
 
 // Multi-tenant columns: tenant_id DEFAULT 1 preserves all historical data
 ensureColumn('users', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
@@ -201,6 +222,112 @@ ensureColumn('cierres_caja', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1'
 ensureColumn('calendar_days', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
 ensureColumn('cash_registers', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
 ensureColumn('active_dates', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1');
+ensureColumn('apartados', 'due_date', 'due_date TEXT');
+
+function primaryKeyColumns(table: string): string[] {
+  return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string; pk: number }[])
+    .filter((column) => column.pk > 0)
+    .sort((a, b) => a.pk - b.pk)
+    .map((column) => column.name)
+    .sort();
+}
+
+// Keys that were historically global must be tenant-scoped.
+try {
+  if (primaryKeyColumns('active_dates').join(',') !== 'date,tenant_id') {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('ALTER TABLE active_dates RENAME TO active_dates_legacy');
+    db.exec(`
+      CREATE TABLE active_dates (
+        date TEXT NOT NULL,
+        tenant_id INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (tenant_id, date)
+      )
+    `);
+    db.exec(`
+      INSERT OR IGNORE INTO active_dates (date, tenant_id, created_at)
+      SELECT date, COALESCE(tenant_id, 1), created_at
+      FROM active_dates_legacy
+    `);
+    db.exec('DROP TABLE active_dates_legacy');
+  }
+} finally {
+  db.exec('PRAGMA foreign_keys = ON');
+}
+
+try {
+  if (primaryKeyColumns('calendar_days').join(',') !== 'date,tenant_id') {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('ALTER TABLE calendar_days RENAME TO calendar_days_legacy');
+    db.exec(`
+      CREATE TABLE calendar_days (
+        date TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('laborado', 'sinventas', 'asueto')),
+        note TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        tenant_id INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (tenant_id, date)
+      )
+    `);
+    db.exec(`
+      INSERT OR IGNORE INTO calendar_days (date, status, note, updated_at, tenant_id)
+      SELECT date, status, note, updated_at, COALESCE(tenant_id, 1)
+      FROM calendar_days_legacy
+    `);
+    db.exec('DROP TABLE calendar_days_legacy');
+  }
+} finally {
+  db.exec('PRAGMA foreign_keys = ON');
+}
+
+try {
+  if (primaryKeyColumns('inventory_items').join(',') !== 'code,tenant_id') {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('ALTER TABLE inventory_variants RENAME TO inventory_variants_legacy');
+    db.exec('ALTER TABLE inventory_items RENAME TO inventory_items_legacy');
+    db.exec(`
+      CREATE TABLE inventory_items (
+        code TEXT NOT NULL,
+        name TEXT NOT NULL,
+        audience TEXT NOT NULL,
+        category TEXT NOT NULL,
+        tenant_id INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (tenant_id, code)
+      )
+    `);
+    db.exec(`
+      INSERT OR IGNORE INTO inventory_items (code, name, audience, category, tenant_id, created_at, updated_at)
+      SELECT code, name, audience, category, COALESCE(tenant_id, 1), created_at, updated_at
+      FROM inventory_items_legacy
+    `);
+    db.exec(`
+      CREATE TABLE inventory_variants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_code TEXT NOT NULL,
+        size TEXT NOT NULL,
+        color TEXT NOT NULL,
+        cost REAL NOT NULL,
+        price REAL NOT NULL,
+        stock INTEGER NOT NULL DEFAULT 0,
+        tenant_id INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (item_code, tenant_id)
+          REFERENCES inventory_items(code, tenant_id) ON DELETE CASCADE
+      )
+    `);
+    db.exec(`
+      INSERT INTO inventory_variants (item_code, size, color, cost, price, stock, tenant_id)
+      SELECT item_code, size, color, cost, price, stock, COALESCE(tenant_id, 1)
+      FROM inventory_variants_legacy
+    `);
+    db.exec('DROP TABLE inventory_variants_legacy');
+    db.exec('DROP TABLE inventory_items_legacy');
+  }
+} finally {
+  db.exec('PRAGMA foreign_keys = ON');
+}
 
 // Seed default users if none exist
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };

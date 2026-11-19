@@ -168,7 +168,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
         note: cajaNote,
       });
 
-      showToast('✅ Arqueo de caja guardado con éxito en el historial.');
+      showToast('Arqueo de caja guardado con éxito en el historial.', false, 'success');
       setCajaNote('');
       loadData();
       if (onRefreshData) onRefreshData();
@@ -204,7 +204,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
         items: inventoryItems,
       });
 
-      showToast('✅ Snapshot de inventario congelado con éxito.');
+      showToast('Snapshot de inventario congelado con éxito.', false, 'success');
       setInvNote('');
       loadData();
       if (onRefreshData) onRefreshData();
@@ -216,7 +216,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
   // Delete Caja Closure (Dueño only)
   const handleDeleteCajaClosure = async (id: number) => {
     if (!isOwner) {
-      showToast('⚠️ Solo el Dueño / Administrador puede eliminar arqueos del historial.', true);
+      showToast('Solo el Dueño / Administrador puede eliminar arqueos del historial.', true);
       return;
     }
     const ok = await confirm({
@@ -239,7 +239,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
   // Delete Inventory Closure (Dueño only)
   const handleDeleteInventoryClosure = async (id: number) => {
     if (!isOwner) {
-      showToast('⚠️ Solo el Dueño / Administrador puede eliminar snapshots de inventario.', true);
+      showToast('Solo el Dueño / Administrador puede eliminar snapshots de inventario.', true);
       return;
     }
     const ok = await confirm({
@@ -266,24 +266,33 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
         <button
           type="button"
           onClick={() => setActiveSubTab('caja')}
-          className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all ${
+          className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 ${
             activeSubTab === 'caja'
               ? 'bg-[#E1EBDC] text-[#2F4A38] border-b-2 border-[#4F6F52] shadow-xs'
               : 'text-[#6F7B72] hover:text-[#2F3A33] hover:bg-[#EEF1E8]'
           }`}
         >
-          💵 F6.1 Arqueo Diario de Caja
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2" />
+            <circle cx="12" cy="12" r="2" />
+          </svg>
+          <span>F6.1 Arqueo Diario de Caja</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveSubTab('inventario')}
-          className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all ${
+          className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 ${
             activeSubTab === 'inventario'
               ? 'bg-[#E1EBDC] text-[#2F4A38] border-b-2 border-[#4F6F52] shadow-xs'
               : 'text-[#6F7B72] hover:text-[#2F3A33] hover:bg-[#EEF1E8]'
           }`}
         >
-          📦 F6.2 Cierre de Inventario (Snapshots)
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+            <path d="m3.3 7 8.7 5 8.7-5" />
+            <path d="M12 22V12" />
+          </svg>
+          <span>F6.2 Cierre de Inventario (Snapshots)</span>
         </button>
       </div>
 

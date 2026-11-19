@@ -22,6 +22,7 @@ export interface CreateApartadoPayload {
   abono: number;       // Abono inicial entregado (USD); debe ser ≤ total
   date?: string;       // Fecha ISO; si se omite usa la fecha actual del servidor
   time?: string;       // Hora (HH:MM AM/PM)
+  dueDate?: string;    // Fecha límite opcional ISO
 }
 
 export const ApartadosService = {

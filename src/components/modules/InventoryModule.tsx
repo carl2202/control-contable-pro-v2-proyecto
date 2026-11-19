@@ -53,7 +53,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
 
   const handleRemoveVariantRow = (index: number) => {
     if (variants.length <= 1) {
-      showToast('⚠️ El modelo debe tener al menos una talla registrada.', true);
+      showToast('El modelo debe tener al menos una talla registrada.', true);
       return;
     }
     setVariants((prev) => prev.filter((_, i) => i !== index));
@@ -106,23 +106,23 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
     const cleanName = name.trim();
 
     if (!cleanCode || !cleanName) {
-      showToast('⚠️ Ingrese código y nombre para el modelo.', true);
+      showToast('Ingrese código y nombre para el modelo.', true);
       return;
     }
 
     if (variants.length === 0) {
-      showToast('⚠️ Agregue al menos una variante con talla y precio.', true);
+      showToast('Agregue al menos una variante con talla y precio.', true);
       return;
     }
 
     // Validate variants
     for (const v of variants) {
       if (!v.size.trim() || !v.color.trim()) {
-        showToast('⚠️ Todas las variantes deben tener talla y color especificados.', true);
+        showToast('Todas las variantes deben tener talla y color especificados.', true);
         return;
       }
       if (isNaN(v.cost) || v.cost < 0 || isNaN(v.price) || v.price < 0 || isNaN(v.stock) || v.stock < 0) {
-        showToast('⚠️ El costo, precio y stock no pueden ser negativos.', true);
+        showToast('El costo, precio y stock no pueden ser negativos.', true);
         return;
       }
     }
@@ -130,7 +130,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
     // Check duplicate sizes/colors in the same item
     const keys = variants.map((v) => `${v.size.trim().toLowerCase()}|${v.color.trim().toLowerCase()}`);
     if (new Set(keys).size !== keys.length) {
-      showToast('⚠️ Hay tallas y colores repetidos en el mismo modelo.', true);
+      showToast('Hay tallas y colores repetidos en el mismo modelo.', true);
       return;
     }
 
@@ -142,7 +142,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
           category,
           variants,
         });
-        showToast(`✅ Modelo ${cleanCode} actualizado con éxito en la base de datos.`);
+        showToast(`Modelo ${cleanCode} actualizado con éxito en la base de datos.`, false, 'success');
       } else {
         await InventoryService.create({
           code: cleanCode,
@@ -151,7 +151,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
           category,
           variants,
         });
-        showToast(`✅ Modelo ${cleanCode} registrado con éxito en inventario.`);
+        showToast(`Modelo ${cleanCode} registrado con éxito en inventario.`, false, 'success');
       }
 
       handleResetForm();
@@ -165,7 +165,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
   // Delete item
   const handleDeleteItem = async (itemCode: string) => {
     if (!isOwner) {
-      showToast('⚠️ Solo el Dueño / Administrador puede eliminar modelos del inventario.', true);
+      showToast('Solo el Dueño / Administrador puede eliminar modelos del inventario.', true);
       return;
     }
 
@@ -542,22 +542,28 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
                         <div className="inline-flex items-center gap-1.5 justify-center">
                           <button
                             type="button"
-                            className="btn btn-light btn-table-action text-[11px] px-2.5 py-1 whitespace-nowrap"
+                            className="btn btn-light btn-table-action text-[11px] px-2.5 py-1 whitespace-nowrap flex items-center gap-1"
                             onClick={() => handleEditItem(item)}
                             title="Editar prenda y variantes"
                           >
-                            <span>✏️</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9"/>
+                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                            </svg>
                             <span>Editar</span>
                           </button>
 
                           {isOwner && (
                             <button
                               type="button"
-                              className="btn btn-danger btn-table-action text-[11px] px-2 py-1 whitespace-nowrap"
+                              className="btn btn-danger btn-table-action text-[11px] px-2 py-1 whitespace-nowrap flex items-center"
                               onClick={() => handleDeleteItem(item.code)}
                               title="Eliminar prenda completa"
                             >
-                              <span>✕</span>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
                             </button>
                           )}
                         </div>

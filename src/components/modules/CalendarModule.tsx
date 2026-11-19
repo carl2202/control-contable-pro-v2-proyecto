@@ -334,9 +334,9 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
                 </label>
                 <div className="grid grid-cols-1 gap-1.5">
                   {[
-                    { key: 'laborado', label: '🟢 Laborado (Día Comercial Activo)', desc: 'Tienda abierta y atendiendo clientes' },
-                    { key: 'sinventas', label: '🟡 Sin Ventas (Abierto pero sin facturar)', desc: 'Jornada transcurrida sin movimiento' },
-                    { key: 'asueto', label: '🔵 Asueto / Feriado / Descanso', desc: 'Día no laboral o festividad nacional' },
+                    { key: 'laborado', tag: 'LAB', tagClass: 'badge-stock', label: 'Laborado (Día Comercial Activo)', desc: 'Tienda abierta y atendiendo clientes' },
+                    { key: 'sinventas', tag: 'SIN', tagClass: 'badge-warning', label: 'Sin Ventas (Abierto pero sin facturar)', desc: 'Jornada transcurrida sin movimiento' },
+                    { key: 'asueto', tag: 'ASU', tagClass: 'badge-cat', label: 'Asueto / Feriado / Descanso', desc: 'Día no laboral o festividad nacional' },
                   ].map((opt) => (
                     <button
                       key={opt.key}
@@ -353,7 +353,10 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
                           : 'border-[#D7DDCF] bg-[#F7F8F3] text-[#46524A] hover:bg-[#EEF1E8]'
                       }`}
                     >
-                      <div>{opt.label}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`badge ${opt.tagClass} text-[10px] font-bold py-0.5 px-1.5`}>{opt.tag}</span>
+                        <span>{opt.label}</span>
+                      </div>
                       <div className="text-[10px] text-[#6F7B72] mt-0.5">{opt.desc}</div>
                     </button>
                   ))}

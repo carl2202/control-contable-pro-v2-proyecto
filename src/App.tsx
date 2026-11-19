@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActiveModule } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FeedbackProvider, useFeedback } from './context/FeedbackContext';
+import { DeviceProvider } from './context/DeviceContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { LoginModal } from './components/LoginModal';
@@ -273,10 +274,12 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <FeedbackProvider>
-        <MainApp />
-      </FeedbackProvider>
-    </AuthProvider>
+    <DeviceProvider>
+      <AuthProvider>
+        <FeedbackProvider>
+          <MainApp />
+        </FeedbackProvider>
+      </AuthProvider>
+    </DeviceProvider>
   );
 }

@@ -120,7 +120,10 @@ export const AuthService = {
   async register(data: {
     username: string;
     password: string;
+    pin: string;
     businessName: string;
+    email?: string;
+    phone?: string;
   }): Promise<AuthSession> {
     try {
       const result = await apiRequest<AuthSession>('/auth/register', {
@@ -134,6 +137,60 @@ export const AuthService = {
       return result;
     } catch (error) {
       console.error('Error en AuthService.register:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Genera y envía un código de verificación OTP por correo o teléfono.
+   */
+  async sendOtp(target: string): Promise<{ success: boolean; message: string; target: string; code?: string }> {
+    try {
+      return await apiRequest<{ success: boolean; message: string; target: string; code?: string }>('/auth/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ target }),
+      });
+    } catch (error) {
+      console.error('Error en AuthService.sendOtp:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Inicia sesión sin contraseña verificando el código OTP recibido.
+   */
+  async verifyOtp(target: string, code: string): Promise<AuthSession> {
+    try {
+      const result = await apiRequest<AuthSession>('/auth/otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({ target, code }),
+      });
+      if (result.token) {
+        localStorage.setItem('contable_token', result.token);
+        localStorage.setItem('contable_user', JSON.stringify(result.user));
+      }
+      return result;
+    } catch (error) {
+      console.error('Error en AuthService.verifyOtp:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Restablece la contraseña/PIN de la cuenta mediante validación del código OTP.
+   */
+  async recoverAccount(data: {
+    target: string;
+    code: string;
+    newPassword: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      return await apiRequest<{ success: boolean; message: string }>('/auth/recover-account', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      console.error('Error en AuthService.recoverAccount:', error);
       throw error;
     }
   },

@@ -74,6 +74,7 @@ export interface Apartado {
   status: ApartadoStatus;
   date: string;
   time: string;
+  dueDate?: string | null;
 }
 
 export type CajaChicaType = 'ingreso' | 'gasto';
@@ -145,6 +146,11 @@ export interface ChartDataPoint {
   date: string;
   sales: number;
   expenses: number;
+}
+
+export interface OperationalAlerts {
+  lowStock: Array<{ code: string; name: string; size: string; color: string; stock: number }>;
+  overdueApartados: Array<{ id: number; clientName: string; prendaDesc: string; dueDate: string; total: number; abono: number; balance: number }>;
 }
 
 export interface ReportsSummary {

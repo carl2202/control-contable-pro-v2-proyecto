@@ -4,6 +4,8 @@ import { ReportsService } from '../../services/reports.service';
 import { DatesService } from '../../services/dates.service';
 import { useAuth } from '../../context/AuthContext';
 import { MetricCard } from '../MetricCard';
+import { AlertsService } from '../../services/alerts.service';
+import { OperationalAlerts } from '../../types';
 
 interface ReportsModuleProps {
   onExportCSV: () => void;
@@ -29,6 +31,10 @@ export function ReportsModule({ onExportCSV }: ReportsModuleProps) {
     chartData: [],
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [alerts, setAlerts] = useState<OperationalAlerts>({
+    lowStock: [],
+    overdueApartados: [],
+  });
 
   const loadDates = useCallback(async () => {
     try {
@@ -53,6 +59,9 @@ export function ReportsModule({ onExportCSV }: ReportsModuleProps) {
 
   useEffect(() => {
     loadDates();
+    AlertsService.getAll().then(setAlerts).catch((error) => {
+      console.error('Error cargando alertas operativas:', error);
+    });
   }, [loadDates]);
 
   useEffect(() => {
@@ -91,7 +100,12 @@ export function ReportsModule({ onExportCSV }: ReportsModuleProps) {
           onClick={onExportCSV}
           className="btn btn-success text-xs flex items-center gap-1.5"
         >
-          <span>📥 Descargar Respaldo Integral CSV</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Descargar Respaldo Integral CSV</span>
         </button>
       </div>
 
@@ -134,6 +148,33 @@ export function ReportsModule({ onExportCSV }: ReportsModuleProps) {
         />
       </div>
 
+      {(alerts.lowStock.length > 0 || alerts.overdueApartados.length > 0) && (
+        <div className="workspace">
+          {alerts.lowStock.length > 0 && (
+            <div className="card-box space-y-2">
+              <h3 className="text-sm font-bold text-[#7E3F27] m-0">Stock bajo</h3>
+              {alerts.lowStock.slice(0, 8).map((item) => (
+                <div key={`${item.code}-${item.size}-${item.color}`} className="flex justify-between gap-3 text-xs border-b border-[#E6EBDF] py-1.5">
+                  <span>{item.name} · {item.code} · {item.size} / {item.color}</span>
+                  <b className="text-[#B2603F]">{item.stock} unidades</b>
+                </div>
+              ))}
+            </div>
+          )}
+          {alerts.overdueApartados.length > 0 && (
+            <div className="card-box space-y-2">
+              <h3 className="text-sm font-bold text-[#7E3F27] m-0">Apartados vencidos</h3>
+              {alerts.overdueApartados.slice(0, 8).map((item) => (
+                <div key={item.id} className="flex justify-between gap-3 text-xs border-b border-[#E6EBDF] py-1.5">
+                  <span>{item.clientName} · {item.prendaDesc} · vence {item.dueDate}</span>
+                  <b className="text-[#B2603F]">${item.balance.toFixed(2)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Desglose Detallado de Gastos & Gráfico de Balance */}
       <div className="workspace">
         {/* Desglose de Egresos según CAMBIOS.md */}
@@ -150,28 +191,54 @@ export function ReportsModule({ onExportCSV }: ReportsModuleProps) {
 
           <div className="space-y-2 text-xs">
             <div className="flex justify-between items-center p-2.5 rounded-lg bg-[#F2F6EE] border border-[#CBDCC5]">
-              <span className="text-[#46524A] font-medium">🛍️ Compra de Ropa / Mercadería:</span>
+              <span className="text-[#46524A] font-medium flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4F6F52]">
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                  <path d="M3 6h18" />
+                  <path d="M16 10a4 4 0 0 1-8 0" />
+                </svg>
+                Compra de Ropa / Mercadería:
+              </span>
               <span className="font-bold text-[#B2603F]">
                 ${summary.clothingPurchases.toFixed(2)}
               </span>
             </div>
 
             <div className="flex justify-between items-center p-2.5 rounded-lg bg-[#F2F6EE] border border-[#CBDCC5]">
-              <span className="text-[#46524A] font-medium">🍔 Alimentación y Refrigerios (Caja Chica):</span>
+              <span className="text-[#46524A] font-medium flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4F6F52]">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                  <line x1="9" y1="9" x2="9.01" y2="9" />
+                  <line x1="15" y1="9" x2="15.01" y2="9" />
+                </svg>
+                Alimentación y Refrigerios (Caja Chica):
+              </span>
               <span className="font-bold text-[#B2603F]">
                 ${summary.foodExpenses.toFixed(2)}
               </span>
             </div>
 
             <div className="flex justify-between items-center p-2.5 rounded-lg bg-[#F2F6EE] border border-[#CBDCC5]">
-              <span className="text-[#46524A] font-medium">💡 Servicios Básicos (Luz, Agua, Internet):</span>
+              <span className="text-[#46524A] font-medium flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4F6F52]">
+                  <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                Servicios Básicos (Luz, Agua, Internet):
+              </span>
               <span className="font-bold text-[#B2603F]">
                 ${summary.utilityExpenses.toFixed(2)}
               </span>
             </div>
 
             <div className="flex justify-between items-center p-2.5 rounded-lg bg-[#F2F6EE] border border-[#CBDCC5]">
-              <span className="text-[#46524A] font-medium">📦 Otros Gastos Operativos:</span>
+              <span className="text-[#46524A] font-medium flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4F6F52]">
+                  <rect x="2" y="7" width="20" height="14" rx="2" />
+                  <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                </svg>
+                Otros Gastos Operativos:
+              </span>
               <span className="font-bold text-[#B2603F]">
                 ${summary.otherExpenses.toFixed(2)}
               </span>
@@ -188,7 +255,7 @@ export function ReportsModule({ onExportCSV }: ReportsModuleProps) {
           {/* Información Fiscal de El Salvador */}
           <div className="p-3 rounded-lg bg-[#EEF1E8] border border-[#D7DDCF] text-xs text-[#46524A] space-y-1">
             <span className="font-semibold text-[#2F4A38] block flex items-center gap-1.5">
-              <span>🇸🇻</span> Régimen Fiscal de El Salvador (IVA 13%):
+              <span className="badge badge-stock text-[10px] font-bold">SV</span> Régimen Fiscal de El Salvador (IVA 13%):
             </span>
             <p className="leading-relaxed">
               El impuesto se calcula sobre el total incluido en las ventas ($
