@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { router as apiRouter, authMiddleware } from './server/routes.js';
+import { dbReady, withDatabaseContext } from './server/db.js';
 import { startAutomaticBackups } from './server/backup.js';
 
 dotenv.config();
@@ -13,10 +14,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 const isProd = process.env.NODE_ENV === 'production';
+if (isProd) app.set('trust proxy', 1);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+app.use(withDatabaseContext);
 
 // Auth token extractor
 app.use(authMiddleware);
@@ -30,6 +34,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 async function startServer() {
+  await dbReady;
   startAutomaticBackups();
   if (!isProd) {
     // Development mode with Vite middleware

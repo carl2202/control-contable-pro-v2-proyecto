@@ -55,7 +55,7 @@ export function BackupsAuditPanel() {
   const createBackup = async () => {
     try {
       await apiRequest<{ success: boolean }>('/admin/backups', { method: 'POST' });
-      showToast('Respaldo SQLite creado correctamente.', false, 'success');
+      showToast('Respaldo de base de datos creado correctamente.', false, 'success');
       loadData();
     } catch (error: any) {
       showToast(error.message || 'No se pudo crear el respaldo.', true);
@@ -84,7 +84,7 @@ export function BackupsAuditPanel() {
     <div style={{ display: 'grid', gap: '16px' }}>
       <section className="card-box">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-          <h3 style={{ margin: 0 }}>Respaldos SQLite</h3>
+          <h3 style={{ margin: 0 }}>Respaldos de base de datos</h3>
           <button type="button" className="btn btn-primary" onClick={createBackup} disabled={loading}>
             Crear respaldo ahora
           </button>

@@ -8,11 +8,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DEMO_OTP
-        value: true
       - key: AUTO_BACKUP
         value: true
       - key: AUTO_BACKUP_INTERVAL_HOURS
         value: 24
       - key: SESSION_SECRET
         generateValue: true
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
