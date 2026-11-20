@@ -1,5 +1,5 @@
-const CACHE_NAME = 'control-contable-pro-v1';
-const APP_SHELL = ['/manifest.json', '/icon-192.svg', '/icon-512.svg'];
+const CACHE_NAME = 'control-contable-pro-v2';
+const APP_SHELL = ['/', '/manifest.json', '/icon-192.svg', '/icon-512.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -16,7 +16,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (request.method !== 'GET' || new URL(request.url).pathname.startsWith('/api/')) return;
+  const url = new URL(request.url);
+  if (
+    request.method !== 'GET'
+    || url.origin !== self.location.origin
+    || url.pathname.startsWith('/api/')
+  ) return;
 
   event.respondWith(
     fetch(request)
@@ -30,8 +35,11 @@ self.addEventListener('fetch', (event) => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        if (request.mode === 'navigate') return caches.match('/');
-        return new Response('', { status: 503, statusText: 'Offline' });
+        if (request.mode === 'navigate') {
+          const appShell = await caches.match('/');
+          if (appShell) return appShell;
+        }
+        return Response.error();
       })
   );
 });
