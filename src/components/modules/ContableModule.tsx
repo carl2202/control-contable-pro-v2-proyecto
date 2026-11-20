@@ -914,8 +914,8 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
             </span>
           </div>
 
-          <div className="table-responsive-container">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="table-responsive-container phone-card-list">
+            <table className="phone-card-table w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                   <th className="p-2.5">Hora / Fecha</th>
@@ -951,13 +951,13 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                           isVoided ? 'opacity-60 bg-red-50/20' : 'hover:bg-[#E6EBDF]/60'
                         }`}
                       >
-                        <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
+                        <td data-label="Hora / Fecha" className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                           {m.time || '--:--'}
                           {activeTab === 'TODOS' && m.date && (
                             <span className="block text-[10px] text-[#9AA59C]">{m.date}</span>
                           )}
                         </td>
-                        <td className="p-2.5 whitespace-nowrap">
+                        <td data-label="Tipo" className="p-2.5 whitespace-nowrap">
                           <span
                             className={`badge ${
                               isVenta ? 'badge-venta' : 'badge-egreso'
@@ -966,7 +966,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                             {m.type.toUpperCase()}
                           </span>
                         </td>
-                        <td className="p-2.5 whitespace-nowrap font-medium text-[#46524A]">
+                        <td data-label="Caja" className="p-2.5 whitespace-nowrap font-medium text-[#46524A]">
                           <span className="inline-flex items-center gap-1">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4F6F52]">
                               <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
@@ -975,7 +975,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                             {m.registerName || 'Caja Principal'}
                           </span>
                         </td>
-                        <td className="p-2.5 whitespace-nowrap">
+                        <td data-label="Comprobante / Vale" className="p-2.5 whitespace-nowrap">
                           <span className="badge badge-cat">{m.doc}</span>
                           {m.voucherCode && (
                             <span className="badge badge-stock ml-1 bg-[#FBF3E1] text-[#7A5A1F] border border-[#EBD6A4]">
@@ -983,21 +983,21 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                             </span>
                           )}
                         </td>
-                        <td className="p-2.5 max-w-xs break-words">
+                        <td data-label="Descripción" className="p-2.5 max-w-xs break-words">
                           <span className={`font-medium ${isVoided ? 'line-through text-[#6F7B72]' : 'text-[#2F3A33]'}`}>
                             {m.desc}
                           </span>
                         </td>
-                        <td className="p-2.5 text-right font-bold whitespace-nowrap text-[#B2603F]">
+                        <td data-label="Débito (-)" className="p-2.5 text-right font-bold whitespace-nowrap text-[#B2603F]">
                           {debitAmt > 0 ? `-$${debitAmt.toFixed(2)}` : '—'}
                         </td>
-                        <td className="p-2.5 text-right font-bold whitespace-nowrap text-[#2F4A38]">
+                        <td data-label="Crédito (+)" className="p-2.5 text-right font-bold whitespace-nowrap text-[#2F4A38]">
                           {creditAmt > 0 ? `+$${creditAmt.toFixed(2)}` : '—'}
                         </td>
-                        <td className="p-2.5 text-right text-[#6F7B72] whitespace-nowrap">
+                        <td data-label="IVA 13%" className="p-2.5 text-right text-[#6F7B72] whitespace-nowrap">
                           ${(m.tax || 0).toFixed(2)}
                         </td>
-                        <td className="p-2.5 text-center whitespace-nowrap">
+                        <td data-label="Estado" className="p-2.5 text-center whitespace-nowrap">
                           <button
                             type="button"
                             className="btn btn-light btn-table-action text-[11px] px-2 py-0.5 mr-1"
@@ -1016,7 +1016,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
                             </span>
                           )}
                         </td>
-                        <td className="p-2.5 text-center whitespace-nowrap">
+                        <td data-label="Acciones" className="p-2.5 text-center whitespace-nowrap">
                           {isVoided ? (
                             <span className="text-[10px] text-[#9AA59C] font-mono">Inmutable</span>
                           ) : isOwner ? (

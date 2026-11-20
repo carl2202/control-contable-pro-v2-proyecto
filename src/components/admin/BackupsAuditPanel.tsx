@@ -91,16 +91,16 @@ export function BackupsAuditPanel() {
         {loading ? <p>Cargando respaldos...</p> : backups.length === 0 ? (
           <p style={{ color: 'var(--text-muted)' }}>Aún no hay respaldos disponibles.</p>
         ) : (
-          <div className="table-responsive-container">
-            <table className="w-full text-xs">
+          <div className="table-responsive-container phone-card-list">
+            <table className="phone-card-table w-full text-xs">
               <thead><tr><th>Archivo</th><th>Fecha</th><th>Tamaño</th><th></th></tr></thead>
               <tbody>
                 {backups.map((backup) => (
                   <tr key={backup.name}>
-                    <td>{backup.name}</td>
-                    <td>{new Date(backup.createdAt).toLocaleString()}</td>
-                    <td>{(backup.size / 1024).toFixed(1)} KB</td>
-                    <td><button type="button" className="btn btn-light" onClick={() => downloadBackup(backup.name)}>Descargar</button></td>
+                    <td data-label="Archivo">{backup.name}</td>
+                    <td data-label="Fecha">{new Date(backup.createdAt).toLocaleString()}</td>
+                    <td data-label="Tamaño">{(backup.size / 1024).toFixed(1)} KB</td>
+                    <td data-label="Acciones"><button type="button" className="btn btn-light" onClick={() => downloadBackup(backup.name)}>Descargar</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -114,16 +114,16 @@ export function BackupsAuditPanel() {
         {loading ? <p>Cargando auditoría...</p> : audits.length === 0 ? (
           <p style={{ color: 'var(--text-muted)' }}>Sin eventos registrados.</p>
         ) : (
-          <div className="table-responsive-container" style={{ maxHeight: '380px', overflow: 'auto' }}>
-            <table className="w-full text-xs">
+          <div className="table-responsive-container phone-card-list" style={{ maxHeight: '380px', overflow: 'auto' }}>
+            <table className="phone-card-table w-full text-xs">
               <thead><tr><th>Fecha</th><th>Acción</th><th>Detalle</th><th>Rol</th></tr></thead>
               <tbody>
                 {audits.map((audit) => (
                   <tr key={audit.id}>
-                    <td>{audit.createdAt}</td>
-                    <td>{audit.action}</td>
-                    <td>{audit.detail}</td>
-                    <td>{audit.userRole || '-'}</td>
+                    <td data-label="Fecha">{audit.createdAt}</td>
+                    <td data-label="Acción">{audit.action}</td>
+                    <td data-label="Detalle">{audit.detail}</td>
+                    <td data-label="Rol">{audit.userRole || '-'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -470,8 +470,8 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
             </span>
           </div>
 
-          <div className="table-responsive-container">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="table-responsive-container phone-card-list">
+            <table className="phone-card-table w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                   <th className="p-2.5 w-24">Código</th>
@@ -490,19 +490,19 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
                 ) : (
                   filteredItems.map((item) => (
                     <tr key={item.code} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
-                      <td className="p-2.5 align-top">
+                      <td data-label="Código" className="p-2.5 align-top">
                         <span className="badge badge-stock font-mono font-bold">
                           {item.code}
                         </span>
                       </td>
-                      <td className="p-2.5 align-top">
+                      <td data-label="Prenda / Categoría" className="p-2.5 align-top">
                         <b className="text-[#2F3A33] block text-xs">{item.name}</b>
                         <div className="flex gap-1 mt-1 flex-wrap">
                           <span className="badge badge-cat text-[10px]">{item.audience || 'General'}</span>
                           <span className="badge badge-cat text-[10px]">{item.category || 'Ropa'}</span>
                         </div>
                       </td>
-                      <td className="p-2 align-top">
+                      <td data-label="Tallas, Precios y Stock" className="p-2 align-top">
                         <ul className="space-y-1 pl-1">
                           {item.variants.map((v, vIdx) => {
                             const isOut = v.stock <= 0;
@@ -538,7 +538,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
                         </ul>
                       </td>
                       {/* Columna de Acciones sin truncamiento */}
-                      <td className="p-2 align-top text-center whitespace-nowrap">
+                      <td data-label="Acciones" className="p-2 align-top text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5 justify-center">
                           <button
                             type="button"

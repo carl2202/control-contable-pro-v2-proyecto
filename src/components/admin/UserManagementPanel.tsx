@@ -161,8 +161,8 @@ export function UserManagementPanel() {
           Cargando usuarios...
         </div>
       ) : (
-        <div className="table-responsive">
-          <table className="terminal-table" style={{ width: '100%' }}>
+        <div className="table-responsive phone-card-list">
+          <table className="terminal-table phone-card-table" style={{ width: '100%' }}>
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Usuario</th>
@@ -175,11 +175,11 @@ export function UserManagementPanel() {
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>
+                  <td data-label="Usuario" style={{ fontWeight: 600, color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>
                     @{u.username}
                   </td>
-                  <td>{u.displayName}</td>
-                  <td>
+                  <td data-label="Nombre Visible">{u.displayName}</td>
+                  <td data-label="Rol">
                     <span
                       style={{
                         display: 'inline-block',
@@ -194,7 +194,7 @@ export function UserManagementPanel() {
                       {u.role === 'dueno' ? 'Dueño / Admin' : 'Cajero / Empleado'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td data-label="Estado" style={{ textAlign: 'center' }}>
                     <span
                       style={{
                         display: 'inline-block',
@@ -209,7 +209,7 @@ export function UserManagementPanel() {
                       {u.active !== false ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td data-label="Acciones" style={{ textAlign: 'right' }}>
                     <button
                       type="button"
                       onClick={() => handleOpenReset(u)}

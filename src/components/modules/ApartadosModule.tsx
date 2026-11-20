@@ -384,8 +384,8 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
             />
           </div>
 
-          <div className="table-responsive-container">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="table-responsive-container phone-card-list">
+            <table className="phone-card-table w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                   <th className="p-2.5">Fecha</th>
@@ -414,30 +414,31 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                     const isOverdue = !isDelivered && !!due && due.getTime() < Date.now();
                     return (
                       <tr key={ap.id} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
-                        <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
+                        <td data-label="Fecha" className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                           {ap.date}
                           <span className="block text-[10px] text-[#9AA59C]">{ap.time}</span>
                         </td>
-                        <td className={`p-2.5 whitespace-nowrap ${isOverdue ? 'text-[#B2603F] font-bold' : 'text-[#6F7B72]'}`}>
+                        <td data-label="Vence" className={`p-2.5 whitespace-nowrap ${isOverdue ? 'text-[#B2603F] font-bold' : 'text-[#6F7B72]'}`}>
                           {ap.dueDate || '-'}
                           {isOverdue && <span className="block text-[10px]">VENCIDO</span>}
                         </td>
-                        <td className="p-2.5 font-semibold text-[#2F3A33]">{ap.clientName}</td>
-                        <td className="p-2.5 text-[#46524A]">{ap.prendaDesc}</td>
-                        <td className="p-2.5 text-right font-bold text-[#2F3A33]">
+                        <td data-label="Cliente" className="p-2.5 font-semibold text-[#2F3A33]">{ap.clientName}</td>
+                        <td data-label="Prenda" className="p-2.5 text-[#46524A]">{ap.prendaDesc}</td>
+                        <td data-label="Total ($)" className="p-2.5 text-right font-bold text-[#2F3A33]">
                           ${ap.total.toFixed(2)}
                         </td>
-                        <td className="p-2.5 text-right font-bold text-[#2F4A38]">
+                        <td data-label="Abonado ($)" className="p-2.5 text-right font-bold text-[#2F4A38]">
                           ${ap.abono.toFixed(2)}
                         </td>
                         <td
+                          data-label="Saldo ($)"
                           className={`p-2.5 text-right font-bold ${
                             saldo > 0 ? 'text-[#B58A3C]' : 'text-[#6F7B72]'
                           }`}
                         >
                           ${saldo.toFixed(2)}
                         </td>
-                        <td className="p-2.5 text-center whitespace-nowrap">
+                        <td data-label="Estado" className="p-2.5 text-center whitespace-nowrap">
                           <span
                             className={`badge ${
                               isDelivered ? 'badge-pagado' : isOverdue ? 'badge-egreso' : 'badge-cajachica'
@@ -446,7 +447,7 @@ export function ApartadosModule({ onRefreshData }: ApartadosModuleProps) {
                             {isDelivered ? 'ENTREGADO' : isOverdue ? 'VENCIDO' : 'APARTADO'}
                           </span>
                         </td>
-                        <td className="p-2.5 text-center whitespace-nowrap">
+                        <td data-label="Acciones" className="p-2.5 text-center whitespace-nowrap">
                           <div className="inline-flex items-center gap-1">
                             {!isDelivered && (
                               <button

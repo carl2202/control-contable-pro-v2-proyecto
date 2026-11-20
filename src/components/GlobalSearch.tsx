@@ -228,6 +228,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
       {/* Overlay */}
       <div
         onClick={onClose}
+        className="global-search-overlay"
         aria-hidden="true"
         style={{
           position: 'fixed',
@@ -240,6 +241,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
 
       {/* Modal */}
       <div
+        className="global-search-dialog"
         role="dialog"
         aria-label="Buscador global"
         aria-modal="true"
@@ -303,6 +305,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
             autoComplete="off"
           />
           <kbd
+            className="global-search-key-hint"
             style={{
               fontSize: '0.65rem',
               padding: '2px 6px',
@@ -320,6 +323,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
         {/* Lista de resultados */}
         <ul
           ref={listRef}
+          className="global-search-results"
           role="listbox"
           aria-label="Resultados de búsqueda"
           style={{
@@ -401,6 +405,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
 
         {/* Pie del modal */}
         <div
+          className="global-search-shortcuts"
           style={{
             borderTop: '1px solid var(--border)',
             padding: '8px 16px',

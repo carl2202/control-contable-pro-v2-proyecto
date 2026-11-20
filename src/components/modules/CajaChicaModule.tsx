@@ -287,8 +287,8 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
             </span>
           </div>
 
-          <div className="table-responsive-container">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="table-responsive-container phone-card-list">
+            <table className="phone-card-table w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                   <th className="p-2.5">Fecha / Hora</th>
@@ -311,11 +311,11 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
                     const isIn = m.type === 'ingreso';
                     return (
                       <tr key={m.id} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
-                        <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
+                        <td data-label="Fecha / Hora" className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                           {m.date}
                           <span className="block text-[10px] text-[#9AA59C]">{m.time}</span>
                         </td>
-                        <td className="p-2.5 whitespace-nowrap">
+                        <td data-label="Tipo" className="p-2.5 whitespace-nowrap">
                           <span
                             className={`badge ${
                               isIn ? 'badge-ingreso' : 'badge-egreso'
@@ -324,21 +324,22 @@ export function CajaChicaModule({ onRefreshData }: CajaChicaModuleProps) {
                             {isIn ? 'INGRESO' : 'GASTO'}
                           </span>
                         </td>
-                        <td className="p-2.5 whitespace-nowrap text-[#46524A]">
+                        <td data-label="Categoría" className="p-2.5 whitespace-nowrap text-[#46524A]">
                           <span className="badge badge-cat text-[10px] inline-flex items-center gap-1.5">
                             <span className="text-[#4F6F52]"><CategoryIcon category={m.category} size={13} /></span>
                             {m.category}
                           </span>
                         </td>
-                        <td className="p-2.5 text-[#2F3A33] font-medium">{m.desc}</td>
+                        <td data-label="Concepto" className="p-2.5 text-[#2F3A33] font-medium">{m.desc}</td>
                         <td
+                          data-label="Monto ($)"
                           className={`p-2.5 text-right font-bold whitespace-nowrap ${
                             isIn ? 'text-[#2F4A38]' : 'text-[#B2603F]'
                           }`}
                         >
                           {isIn ? '+' : '-'}${m.amount.toFixed(2)}
                         </td>
-                        <td className="p-2 text-center whitespace-nowrap">
+                        <td data-label="Acciones" className="p-2 text-center whitespace-nowrap">
                           {isOwner ? (
                             <button
                               type="button"

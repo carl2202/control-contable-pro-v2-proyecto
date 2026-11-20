@@ -445,8 +445,8 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                 </h3>
               </div>
 
-              <div className="table-responsive-container">
-                <table className="w-full text-left border-collapse text-xs">
+              <div className="table-responsive-container phone-card-list">
+                <table className="phone-card-table w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                       <th className="p-2.5">Fecha / Hora</th>
@@ -467,17 +467,17 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                     ) : (
                       cajaClosures.map((c) => (
                         <tr key={c.id} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
-                          <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
+                          <td data-label="Fecha / Hora" className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                             {c.date} <span className="text-[10px] text-[#9AA59C] block">{c.time}</span>
                           </td>
-                          <td className="p-2.5 text-[#2F3A33] font-medium">{c.cashierName}</td>
-                          <td className="p-2.5 text-right font-medium text-[#46524A]">
+                          <td data-label="Cajero" className="p-2.5 text-[#2F3A33] font-medium">{c.cashierName}</td>
+                          <td data-label="Esperado" className="p-2.5 text-right font-medium text-[#46524A]">
                             ${c.expectedTotal.toFixed(2)}
                           </td>
-                          <td className="p-2.5 text-right font-bold text-[#2F4A38]">
+                          <td data-label="Recontado" className="p-2.5 text-right font-bold text-[#2F4A38]">
                             ${c.countedTotal.toFixed(2)}
                           </td>
-                          <td className="p-2.5 text-center whitespace-nowrap">
+                          <td data-label="Diferencia" className="p-2.5 text-center whitespace-nowrap">
                             <span
                               className={`badge ${
                                 c.difference === 0
@@ -492,7 +492,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                                 : `${c.difference > 0 ? '+' : ''}$${c.difference.toFixed(2)}`}
                             </span>
                           </td>
-                          <td className="p-2.5 text-center whitespace-nowrap">
+                          <td data-label="Acciones" className="p-2.5 text-center whitespace-nowrap">
                             {isOwner && (
                               <button
                                 type="button"
@@ -630,8 +630,8 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                 </h3>
               </div>
 
-              <div className="table-responsive-container">
-                <table className="w-full text-left border-collapse text-xs">
+              <div className="table-responsive-container phone-card-list">
+                <table className="phone-card-table w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-[#CBDCC5] bg-[#EDF3E8] text-[#2F4A38]">
                       <th className="p-2.5">Fecha / Hora</th>
@@ -652,23 +652,23 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
                     ) : (
                       inventoryClosures.map((snap) => (
                         <tr key={snap.id} className="border-b border-[#E6EBDF] hover:bg-[#E6EBDF]/60 transition-colors">
-                          <td className="p-2.5 whitespace-nowrap text-[#6F7B72]">
+                          <td data-label="Fecha / Hora" className="p-2.5 whitespace-nowrap text-[#6F7B72]">
                             {snap.date} <span className="text-[10px] text-[#9AA59C] block">{snap.time}</span>
                           </td>
-                          <td className="p-2.5">
+                          <td data-label="Alcance" className="p-2.5">
                             <span className="badge badge-cat text-[10px]">{snap.scope}</span>
                             {snap.note && <span className="block text-[10px] text-[#6F7B72] mt-0.5">{snap.note}</span>}
                           </td>
-                          <td className="p-2.5 text-right font-medium text-[#2F3A33]">
+                          <td data-label="Unidades" className="p-2.5 text-right font-medium text-[#2F3A33]">
                             {snap.totals.totalUnits} un.
                           </td>
-                          <td className="p-2.5 text-right font-bold text-[#B58A3C]">
+                          <td data-label="Valor Costo" className="p-2.5 text-right font-bold text-[#B58A3C]">
                             ${snap.totals.totalCostValue.toFixed(2)}
                           </td>
-                          <td className="p-2.5 text-right font-bold text-[#2F4A38]">
+                          <td data-label="Valor Venta" className="p-2.5 text-right font-bold text-[#2F4A38]">
                             ${snap.totals.totalSaleValue.toFixed(2)}
                           </td>
-                          <td className="p-2.5 text-center whitespace-nowrap">
+                          <td data-label="Acciones" className="p-2.5 text-center whitespace-nowrap">
                             {isOwner && (
                               <button
                                 type="button"

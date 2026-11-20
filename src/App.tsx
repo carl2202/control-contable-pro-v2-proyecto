@@ -241,7 +241,10 @@ function MainApp() {
   // APLICACIÓN PRINCIPAL (Sesión activa y cookies aceptadas)
   // ──────────────────────────────────────────────────────────
   return (
-    <div className="container min-h-screen py-4 px-2 sm:px-4">
+    <div
+      className={`container min-h-screen py-4 px-2 sm:px-4${isMobile && isMobileModuleView ? ' mobile-module-screen' : ''}`}
+      data-view-mode={isMobile ? 'phone' : 'desktop'}
+    >
       {/* Encabezado con estado, tema, sincronización y buscador */}
       <Header
         onOpenLogin={() => setIsLoginModalOpen(true)}

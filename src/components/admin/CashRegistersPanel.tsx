@@ -188,7 +188,7 @@ export function CashRegistersPanel() {
             Nueva Caja Registradora
           </h5>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+          <div className="cash-register-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                 Nombre de la caja *
@@ -290,8 +290,8 @@ export function CashRegistersPanel() {
           No hay cajas registradas. Crea la primera caja con el botón de arriba.
         </div>
       ) : (
-        <div className="phone-table-scroll" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+        <div className="phone-table-scroll phone-card-list" style={{ overflowX: 'auto' }}>
+          <table className="phone-card-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface)' }}>
                 <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Nombre</th>
@@ -313,10 +313,10 @@ export function CashRegistersPanel() {
                   onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-hover, #EDF3E8)')}
                   onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = '')}
                 >
-                  <td style={{ padding: '11px 12px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  <td data-label="Nombre" style={{ padding: '11px 12px', fontWeight: 600, color: 'var(--text-main)' }}>
                     {reg.name}
                   </td>
-                  <td style={{ padding: '11px 12px', color: 'var(--text-muted)' }}>
+                  <td data-label="Tipo" style={{ padding: '11px 12px', color: 'var(--text-muted)' }}>
                     <span style={{
                       display: 'inline-block',
                       padding: '2px 8px',
@@ -330,7 +330,7 @@ export function CashRegistersPanel() {
                       {reg.kind === 'operativa' ? 'Operativa' : 'Caja Chica'}
                     </span>
                   </td>
-                  <td style={{
+                  <td data-label="Saldo" style={{
                     padding: '11px 12px',
                     textAlign: 'right',
                     fontWeight: 700,
@@ -339,7 +339,7 @@ export function CashRegistersPanel() {
                   }}>
                     {formatCurrency(reg.balance)}
                   </td>
-                  <td style={{ padding: '11px 12px', textAlign: 'center' }}>
+                  <td data-label="Estado" style={{ padding: '11px 12px', textAlign: 'center' }}>
                     <span style={{
                       display: 'inline-block',
                       padding: '2px 10px',
@@ -353,7 +353,7 @@ export function CashRegistersPanel() {
                       {reg.active ? '● Activa' : '○ Archivada'}
                     </span>
                   </td>
-                  <td style={{ padding: '11px 12px', textAlign: 'center' }}>
+                  <td data-label="Acciones" style={{ padding: '11px 12px', textAlign: 'center' }}>
                     <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
                       <button
                         type="button"
