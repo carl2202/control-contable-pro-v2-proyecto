@@ -5,6 +5,7 @@ import { DatesService } from '../../services/dates.service';
 import { InventoryService } from '../../services/inventory.service';
 import { CajaChicaService } from '../../services/cajaChica.service';
 import { CalendarService } from '../../services/calendar.service';
+import { apiFetch } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useFeedback } from '../../context/FeedbackContext';
 import { MetricCard } from '../MetricCard';
@@ -331,19 +332,22 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
   };
 
   const handlePrintReceipt = async (mov: Movement) => {
+    const printWindow = window.open('about:blank', '_blank');
+    if (!printWindow) {
+      showToast('El navegador bloqueó la ventana del comprobante.', true);
+      return;
+    }
+    printWindow.opener = null;
+
     try {
-      const token = localStorage.getItem('contable_token');
-      const response = await fetch(`/api/movements/${mov.id}/receipt`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) throw new Error('No se pudo generar el comprobante.');
+      const response = await apiFetch(`/movements/${mov.id}/receipt`);
       const html = await response.text();
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!printWindow) showToast('El navegador bloqueó la ventana del comprobante.', true);
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      printWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err: any) {
+      printWindow.close();
       showToast(err.message || 'No se pudo generar el comprobante.', true);
     }
   };

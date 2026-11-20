@@ -8,12 +8,13 @@
 // ============================================================
 
 const API_BASE = '/api';
+const API_TIMEOUT_MS = 30_000;
 
 export class ApiError extends Error {
   status: number;
-  data: any;
+  data: unknown;
 
-  constructor(message: string, status: number, data?: any) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -21,49 +22,101 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('contable_token');
+function expireSession(): void {
+  try {
+    localStorage.removeItem('contable_token');
+    localStorage.removeItem('contable_user');
+  } catch (error) {
+    console.warn('No se pudo limpiar la sesión local:', error);
+  }
+  window.dispatchEvent(new CustomEvent('auth:expired'));
+}
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
-  };
+function getErrorDetails(data: unknown, response: Response): string {
+  if (data && typeof data === 'object') {
+    const payload = data as Record<string, unknown>;
+    if (typeof payload.error === 'string') return payload.error;
+    if (typeof payload.message === 'string') return payload.message;
+  }
+  return `Error ${response.status}${response.statusText ? `: ${response.statusText}` : ''}`;
+}
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutSignal = options.signal;
+  let timedOut = false;
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, API_TIMEOUT_MS);
+  const forwardAbort = () => controller.abort();
+
+  if (timeoutSignal?.aborted) {
+    controller.abort();
+  } else {
+    timeoutSignal?.addEventListener('abort', forwardAbort, { once: true });
   }
 
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const token = localStorage.getItem('contable_token');
+    const headers = new Headers(options.headers);
+    if (options.body !== undefined && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
 
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        localStorage.removeItem('contable_token');
-        localStorage.removeItem('contable_user');
-        window.dispatchEvent(new CustomEvent('auth:expired'));
+    if (!response.ok) {
+      const body = await response.text();
+      let data: unknown = {};
+      if (body) {
+        try {
+          data = JSON.parse(body);
+        } catch {
+          data = { message: body.slice(0, 300) };
+        }
       }
-      const message = data.error || data.message || `Error ${res.status}: ${res.statusText}`;
-      throw new ApiError(message, res.status, data);
+
+      if (response.status === 401) expireSession();
+      throw new ApiError(getErrorDetails(data, response), response.status, data);
     }
 
-    return data as T;
-  } catch (err: any) {
-    if (err instanceof ApiError) {
-      throw err;
+    return response;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+
+    if (timedOut) {
+      throw new ApiError('El servidor tardó demasiado en responder. Verifica tu conexión e inténtalo de nuevo.', 0);
     }
-    // Network or connectivity error
-    const netError = new ApiError(
-      err.message === 'Failed to fetch' || !navigator.onLine
-        ? 'No se pudo conectar con el servidor. Verifica tu conexión de red.'
-        : (err.message || 'Error inesperado de comunicación con la API.'),
-      0
-    );
-    console.error(`[API Network Error] ${endpoint}:`, err);
-    throw netError;
+    if (timeoutSignal?.aborted) {
+      throw new ApiError('La solicitud fue cancelada.', 0);
+    }
+
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const message = isOffline
+      ? 'No se pudo conectar con el servidor. Verifica tu conexión de red.'
+      : 'No se pudo completar la solicitud. Verifica tu conexión e inténtalo de nuevo.';
+    console.error(`[API Network Error] ${endpoint}:`, error);
+    throw new ApiError(message, 0);
+  } finally {
+    window.clearTimeout(timeoutId);
+    timeoutSignal?.removeEventListener('abort', forwardAbort);
+  }
+}
+
+export async function apiRequest<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const response = await apiFetch(endpoint, options);
+  const body = await response.text();
+  if (!body) return null as T;
+
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new ApiError('El servidor devolvió una respuesta no válida.', response.status, body.slice(0, 300));
   }
 }

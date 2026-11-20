@@ -72,17 +72,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
 
   // ── refreshUser ────────────────────────────────────────────
-  // Consulta /auth/me para validar el token actual y actualizar
-  // los datos del usuario. Si falla, limpia la sesión.
+  // Consulta /auth/me para validar y actualizar el usuario; una falla de red
+  // conserva la sesión local hasta que el servidor confirme que expiró.
   const refreshUser = useCallback(async () => {
     try {
       const current = await AuthService.getMe();
       setUser(current);
       if (!current) setToken(null);
-    } catch {
-      // Token inválido o error de red: limpiar sesión
-      setUser(null);
-      setToken(null);
+    } catch (error) {
+      // Una interrupción temporal no debe cerrar la sesión guardada en el dispositivo.
+      console.warn('No se pudo verificar la sesión con el servidor:', error);
     } finally {
       setLoading(false);
     }

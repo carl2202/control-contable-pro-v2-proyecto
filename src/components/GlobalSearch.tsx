@@ -15,6 +15,7 @@ import React, {
   KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { ActiveModule } from '../types';
+import { RegistersService } from '../services/registers.service';
 
 interface SearchResult {
   id: string;
@@ -152,9 +153,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
 
   const fetchRegisters = async () => {
     try {
-      const res = await fetch('/api/registers', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json() as Array<{ id: number; name: string }>;
+      const data = await RegistersService.getRegisters();
       const mapped: SearchResult[] = data.map((r) => ({
         id: `register-${r.id}`,
         label: `Caja: ${r.name}`,
@@ -163,8 +162,8 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
         module: 'cierre' as ActiveModule,
       }));
       setRegisters(mapped);
-    } catch {
-      // sin cajas disponibles
+    } catch (error) {
+      console.error('No se pudieron cargar las cajas para la búsqueda:', error);
     }
   };
 

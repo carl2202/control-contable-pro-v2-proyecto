@@ -50,28 +50,23 @@ export const AuthService = {
 
   /**
    * Verifica el token actual contra el servidor.
-   * Si no hay token intenta restaurar el usuario desde localStorage.
-   * Devuelve null si la sesión no es válida.
+   * Devuelve null si no hay sesión y propaga errores de red o del servidor.
    */
   async getMe(): Promise<User | null> {
-    try {
-      const token = localStorage.getItem('contable_token');
-      if (!token) {
-        localStorage.removeItem('contable_user');
-        return null;
-      }
-      // Con token: validar contra el servidor
-      const data = await apiRequest<{ user: User | null }>('/auth/me');
-      if (data.user) {
-        localStorage.setItem('contable_user', JSON.stringify(data.user));
-      }
-      return data.user;
-    } catch (error) {
-      console.warn('Sesión no válida o expirada:', error);
-      localStorage.removeItem('contable_token');
+    const token = localStorage.getItem('contable_token');
+    if (!token) {
       localStorage.removeItem('contable_user');
       return null;
     }
+
+    const data = await apiRequest<{ user: User | null }>('/auth/me');
+    if (data.user) {
+      localStorage.setItem('contable_user', JSON.stringify(data.user));
+    } else {
+      localStorage.removeItem('contable_token');
+      localStorage.removeItem('contable_user');
+    }
+    return data.user;
   },
 
   /**

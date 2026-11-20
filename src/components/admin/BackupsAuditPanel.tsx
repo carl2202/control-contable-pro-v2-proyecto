@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiRequest } from '../../services/api';
+import { apiFetch, apiRequest } from '../../services/api';
 import { useFeedback } from '../../context/FeedbackContext';
 
 interface BackupItem {
@@ -63,21 +63,20 @@ export function BackupsAuditPanel() {
   };
 
   const downloadBackup = async (name: string) => {
-    const token = localStorage.getItem('contable_token');
-    const response = await fetch(`/api/admin/backups/${encodeURIComponent(name)}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) {
-      showToast('No se pudo descargar el respaldo.', true);
-      return;
+    try {
+      const response = await apiFetch(`/admin/backups/${encodeURIComponent(name)}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error: any) {
+      showToast(error.message || 'No se pudo descargar el respaldo.', true);
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   return (

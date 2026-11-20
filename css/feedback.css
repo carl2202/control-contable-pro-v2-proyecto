@@ -168,6 +168,7 @@ body.dlg-open {
     box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25);
     width: min(480px, 100%);
     max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 40px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -252,4 +253,29 @@ body.dlg-open {
 
 @media (prefers-reduced-motion: reduce) {
     .toast-item, .dlg-overlay, .dlg { animation: none; }
+}
+
+@media (max-width: 768px) {
+    #toastStack {
+        top: max(12px, env(safe-area-inset-top));
+        right: max(12px, env(safe-area-inset-right));
+        width: min(400px, calc(100vw - 24px));
+    }
+
+    .dlg-overlay {
+        padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+            max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .dlg {
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+    }
+
+    .dlg-body {
+        min-height: 0;
+        -webkit-overflow-scrolling: touch;
+    }
 }

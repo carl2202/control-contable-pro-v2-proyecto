@@ -14,23 +14,37 @@ const PING_INTERVAL_MS = 30_000;
 
 export default function SyncIndicator() {
   const [status, setStatus] = useState<SyncState>('syncing');
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const ping = async () => {
-    setStatus('syncing');
-    try {
-      const res = await fetch('/api/health', { method: 'GET', cache: 'no-store' });
-      setStatus(res.ok ? 'online' : 'offline');
-    } catch {
-      setStatus('offline');
-    }
-  };
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    ping();
-    intervalRef.current = setInterval(ping, PING_INTERVAL_MS);
+    let active = true;
+    let requestController: AbortController | null = null;
+
+    const ping = async () => {
+      requestController = new AbortController();
+      const requestTimeout = window.setTimeout(() => requestController?.abort(), 10_000);
+      setStatus('syncing');
+      try {
+        const response = await fetch('/api/health', {
+          method: 'GET',
+          cache: 'no-store',
+          signal: requestController.signal,
+        });
+        if (active) setStatus(response.ok ? 'online' : 'offline');
+      } catch {
+        if (active) setStatus('offline');
+      } finally {
+        window.clearTimeout(requestTimeout);
+        requestController = null;
+        if (active) timeoutRef.current = setTimeout(ping, PING_INTERVAL_MS);
+      }
+    };
+
+    void ping();
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      active = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      requestController?.abort();
     };
   }, []);
 
