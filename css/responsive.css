@@ -942,3 +942,95 @@
         overflow-wrap: anywhere;
     }
 }
+
+/* La navegación a pantalla completa se activa solo en el modo Teléfono. */
+html.device-mobile,
+body.device-mobile {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.device-mobile .container,
+.device-mobile .app-layout,
+.device-mobile .main-content-area,
+.device-mobile .main-content-area > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.device-mobile .app-layout {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.device-mobile .modules-sidebar-right {
+    display: none;
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.device-mobile .mobile-module-menu .modules-sidebar-right {
+    display: block;
+}
+
+.device-mobile .mobile-module-menu .main-content-area {
+    display: none;
+}
+
+.device-mobile .main-modules {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+}
+
+.device-mobile .module-btn {
+    min-width: 0;
+}
+
+.device-mobile .terminal-brand-area .header-menu-toggle {
+    display: inline-flex;
+}
+
+.device-mobile .mobile-module-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0 0 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+
+.device-mobile .mobile-module-back {
+    display: inline-flex;
+    flex: 0 0 40px;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--surface-alt);
+    color: var(--primary);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.device-mobile .mobile-module-heading h2 {
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-main);
+    font-size: 1rem;
+    font-weight: 700;
+}

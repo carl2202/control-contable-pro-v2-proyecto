@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActiveModule } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FeedbackProvider, useFeedback } from './context/FeedbackContext';
-import { DeviceProvider } from './context/DeviceContext';
+import { DeviceProvider, useDevice } from './context/DeviceContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { LoginModal } from './components/LoginModal';
@@ -18,18 +18,36 @@ import GlobalSearch from './components/GlobalSearch';
 import CookieBanner, { useCookieConsent } from './components/CookieBanner';
 import { exportComprehensiveBackupCSV } from './utils/exportCsv';
 
+const moduleLabels: Record<ActiveModule, string> = {
+  contable: 'Ventas y Caja',
+  inventario: 'Inventario',
+  apartados: 'Apartados',
+  cajaChica: 'Caja Chica',
+  reportes: 'Reportes',
+  cierre: 'Cierres y Arqueo',
+  calendario: 'Calendario',
+  admin: 'Gestión de Cajas / Usuarios',
+};
+
 // ============================================================
 // MainApp — componente raíz interno (requiere AuthContext activo)
 // ============================================================
 function MainApp() {
   const [activeModule, setActiveModule] = useState<ActiveModule>('contable');
+  const [isMobileModuleView, setIsMobileModuleView] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   const { user, loading, isOwner } = useAuth();
+  const { isMobile } = useDevice();
   const { showToast } = useFeedback();
   const { consented } = useCookieConsent();
+
+  const navigateToModule = (mod: ActiveModule) => {
+    setActiveModule(mod);
+    if (isMobile) setIsMobileModuleView(true);
+  };
 
   // ──────────────────────────────────────────────────────────
   // Atajos de teclado: F1–F7 para módulos, Ctrl+K para buscador
@@ -48,21 +66,21 @@ function MainApp() {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
 
       switch (e.key) {
-        case 'F1': e.preventDefault(); setActiveModule('contable');   break;
-        case 'F2': e.preventDefault(); setActiveModule('inventario'); break;
-        case 'F3': e.preventDefault(); setActiveModule('apartados');  break;
-        case 'F4': e.preventDefault(); setActiveModule('cajaChica');  break;
+        case 'F1': e.preventDefault(); navigateToModule('contable');   break;
+        case 'F2': e.preventDefault(); navigateToModule('inventario'); break;
+        case 'F3': e.preventDefault(); navigateToModule('apartados');  break;
+        case 'F4': e.preventDefault(); navigateToModule('cajaChica');  break;
         case 'F5':
-          if (e.altKey) { e.preventDefault(); setActiveModule('reportes'); }
+          if (e.altKey) { e.preventDefault(); navigateToModule('reportes'); }
           break;
-        case 'F6': e.preventDefault(); setActiveModule('cierre');     break;
-        case 'F7': e.preventDefault(); setActiveModule('calendario'); break;
+        case 'F6': e.preventDefault(); navigateToModule('cierre');     break;
+        case 'F7': e.preventDefault(); navigateToModule('calendario'); break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isMobile]);
 
   const handleExportBackup = async () => {
     try {
@@ -229,12 +247,31 @@ function MainApp() {
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onExportCSV={handleExportBackup}
         onOpenSearch={() => setIsSearchOpen(true)}
-        onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
+        onToggleSidebar={() => {
+          if (isMobile) {
+            setIsMobileModuleView(false);
+          } else {
+            setIsSidebarOpen((open) => !open);
+          }
+        }}
       />
 
       {/* Rejilla principal */}
-      <div className="app-layout">
+      <div className={`app-layout${isMobile && !isMobileModuleView ? ' mobile-module-menu' : ''}`}>
         <main className="main-content-area">
+          {isMobile && isMobileModuleView && (
+            <div className="mobile-module-heading">
+              <button
+                type="button"
+                className="mobile-module-back"
+                onClick={() => setIsMobileModuleView(false)}
+                aria-label="Regresar a la lista de módulos"
+              >
+                ←
+              </button>
+              <h2>{moduleLabels[activeModule]}</h2>
+            </div>
+          )}
           {activeModule === 'contable'   && <ContableModule />}
           {activeModule === 'inventario' && <InventoryModule />}
           {activeModule === 'apartados'  && <ApartadosModule />}
@@ -251,7 +288,7 @@ function MainApp() {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onSelectModule={(mod) => {
-            setActiveModule(mod);
+            navigateToModule(mod);
             setIsSidebarOpen(false);
           }}
         />
@@ -268,7 +305,7 @@ function MainApp() {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onNavigate={(mod) => {
-          setActiveModule(mod);
+          navigateToModule(mod);
           setIsSearchOpen(false);
         }}
       />
