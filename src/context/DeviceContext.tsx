@@ -26,18 +26,12 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
 
   const [autoIsMobile, setAutoIsMobile] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return (
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-      window.innerWidth < 768
-    );
+    return window.innerWidth < 768;
   });
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        window.innerWidth < 768;
-      setAutoIsMobile(mobile);
+      setAutoIsMobile(window.innerWidth < 768);
     };
 
     window.addEventListener('resize', handleResize);
@@ -62,17 +56,14 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   // Aplicar clases globales al contenedor HTML/Body para reaccionar ordenadamente a nivel CSS
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      if (isMobile) {
-        document.documentElement.classList.add('device-mobile');
-        document.documentElement.classList.remove('device-desktop');
-        document.body.classList.add('device-mobile');
-        document.body.classList.remove('device-desktop');
-      } else {
-        document.documentElement.classList.add('device-desktop');
-        document.documentElement.classList.remove('device-mobile');
-        document.body.classList.add('device-desktop');
-        document.body.classList.remove('device-mobile');
-      }
+      const viewMode = isMobile ? 'phone' : 'desktop';
+      const modeClasses = ['device-mobile', 'device-desktop', 'mode-phone', 'mode-desktop'];
+      [document.documentElement, document.body].forEach((element) => {
+        element.dataset.viewMode = viewMode;
+        modeClasses.forEach((className) => element.classList.remove(className));
+        element.classList.add(isMobile ? 'device-mobile' : 'device-desktop');
+        element.classList.add(isMobile ? 'mode-phone' : 'mode-desktop');
+      });
     }
   }, [isMobile]);
 
@@ -103,6 +94,7 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
       aria-label="Selector de dispositivo"
       style={{
         display: 'inline-flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         background: 'var(--surface-alt)',
         border: '1px solid var(--border)',
@@ -151,14 +143,14 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
           gap: '5px',
           padding: compact ? '4px 8px' : '6px 10px',
           fontSize: '0.72rem',
-          fontWeight: !isMobile ? 700 : 500,
+          fontWeight: deviceMode === 'desktop' ? 700 : 500,
           border: 'none',
           borderRadius: 'var(--radius-sm)',
-          background: !isMobile ? 'var(--primary)' : 'transparent',
-          color: !isMobile ? '#FFFFFF' : 'var(--text-muted)',
+          background: deviceMode === 'desktop' ? 'var(--primary)' : 'transparent',
+          color: deviceMode === 'desktop' ? '#FFFFFF' : 'var(--text-muted)',
           cursor: 'pointer',
           transition: 'all 0.16s ease',
-          boxShadow: !isMobile ? '0 1px 3px rgba(79, 111, 82, 0.3)' : 'none',
+          boxShadow: deviceMode === 'desktop' ? '0 1px 3px rgba(79, 111, 82, 0.3)' : 'none',
         }}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -180,14 +172,14 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
           gap: '5px',
           padding: compact ? '4px 8px' : '6px 10px',
           fontSize: '0.72rem',
-          fontWeight: isMobile ? 700 : 500,
+          fontWeight: deviceMode === 'mobile' ? 700 : 500,
           border: 'none',
           borderRadius: 'var(--radius-sm)',
-          background: isMobile ? 'var(--primary)' : 'transparent',
-          color: isMobile ? '#FFFFFF' : 'var(--text-muted)',
+          background: deviceMode === 'mobile' ? 'var(--primary)' : 'transparent',
+          color: deviceMode === 'mobile' ? '#FFFFFF' : 'var(--text-muted)',
           cursor: 'pointer',
           transition: 'all 0.16s ease',
-          boxShadow: isMobile ? '0 1px 3px rgba(79, 111, 82, 0.3)' : 'none',
+          boxShadow: deviceMode === 'mobile' ? '0 1px 3px rgba(79, 111, 82, 0.3)' : 'none',
         }}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

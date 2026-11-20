@@ -255,7 +255,7 @@ body.dlg-open {
     .toast-item, .dlg-overlay, .dlg { animation: none; }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     #toastStack {
         top: max(12px, env(safe-area-inset-top));
         right: max(12px, env(safe-area-inset-right));

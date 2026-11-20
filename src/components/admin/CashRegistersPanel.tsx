@@ -290,7 +290,7 @@ export function CashRegistersPanel() {
           No hay cajas registradas. Crea la primera caja con el botón de arriba.
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="phone-table-scroll" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface)' }}>

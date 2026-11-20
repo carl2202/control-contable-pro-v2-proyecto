@@ -40,7 +40,7 @@
     display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     /* Optimización táctil para móviles: botones mínimo 44x48px */
     .btn,
     button[type="button"],
@@ -97,7 +97,7 @@
     display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     html,
     body {
         max-width: 100%;
@@ -652,7 +652,7 @@
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .no-flex-gap .terminal-brand-area > div:first-child > * + * {
         margin-left: 6px;
     }
@@ -712,7 +712,7 @@
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .op-tile,
     .cat-chip,
     .tab,
@@ -821,7 +821,7 @@
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .metrics-grid,
     #reportMetricsGrid,
     #ccMetricsGrid,
@@ -980,9 +980,8 @@ body.device-mobile {
 }
 
 .device-mobile .main-modules {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: minmax(0, 1fr);
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     gap: 8px;
 }
 
@@ -1033,4 +1032,231 @@ body.device-mobile {
     color: var(--text-main);
     font-size: 1rem;
     font-weight: 700;
+}
+
+.device-mobile .module-btn {
+    align-items: center;
+    gap: 10px;
+}
+
+.device-mobile .module-icon-box {
+    display: inline-flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    overflow: visible;
+}
+
+.device-mobile .module-icon-box svg {
+    display: block;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    min-height: 22px;
+}
+
+.device-mobile .module-info {
+    display: flex;
+    flex: 1 1 0% !important;
+    flex-direction: column;
+    min-width: 0 !important;
+    overflow: visible;
+}
+
+.device-mobile .module-info .module-name,
+.device-mobile .module-info .module-desc {
+    display: block !important;
+    min-width: 0;
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
+    white-space: normal !important;
+}
+
+.device-mobile .main-content-area .table-responsive-container,
+.device-mobile .main-content-area .table-responsive,
+.device-mobile .main-content-area .table-container,
+.device-mobile .main-content-area .phone-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    scrollbar-color: var(--border) transparent;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+.device-mobile .main-content-area .table-responsive-container table,
+.device-mobile .main-content-area .table-responsive table,
+.device-mobile .main-content-area .table-container table,
+.device-mobile .main-content-area .phone-table-scroll table {
+    width: 100%;
+    min-width: 620px;
+    max-width: none;
+    table-layout: auto;
+}
+
+.device-mobile .main-content-area .table-actions-cell,
+.device-mobile .main-content-area .table-actions-cell .btn,
+.device-mobile .main-content-area .btn-table-action {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.device-mobile .main-content-area .table-responsive-container::-webkit-scrollbar,
+.device-mobile .main-content-area .table-responsive::-webkit-scrollbar,
+.device-mobile .main-content-area .table-container::-webkit-scrollbar,
+.device-mobile .main-content-area .phone-table-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+html.mode-phone *,
+html.mode-phone *::before,
+html.mode-phone *::after {
+    box-sizing: border-box;
+}
+
+html.mode-phone,
+body.mode-phone {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+body.mode-phone {
+    padding: 8px;
+}
+
+.mode-phone .container,
+.mode-phone .app-layout,
+.mode-phone .app-layout > *,
+.mode-phone .main-content-area,
+.mode-phone .main-content-area > *,
+.mode-phone .workspace,
+.mode-phone .workspace > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.mode-phone .container,
+.mode-phone .app-layout {
+    overflow-x: hidden;
+}
+
+.mode-phone .container {
+    padding-inline: 8px !important;
+}
+
+.mode-phone .container > header,
+.mode-phone .header-actions,
+.mode-phone .terminal-brand-area,
+.mode-phone .terminal-brand-area > div:first-child {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+.mode-phone .header-device-switcher,
+.mode-phone .header-device-switcher [role="group"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.mode-phone .header-device-switcher [role="group"] button {
+    flex: 1 1 96px;
+    min-width: 0;
+    justify-content: center;
+    white-space: normal;
+}
+
+.mode-phone .header-user-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.mode-phone .header-user-card > div:not(.header-user-actions) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.mode-phone .header-user-actions {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mode-phone .header-user-actions button {
+    flex: 1 1 120px;
+    min-width: 0;
+    white-space: normal;
+}
+
+.mode-phone .header-search-shortcut,
+.mode-phone .module-key-shortcut {
+    display: none !important;
+}
+
+.mode-phone .main-content-area .grid.grid-cols-2,
+.mode-phone .main-content-area [class~="grid-cols-2"],
+.mode-phone .main-content-area [class~="sm:grid-cols-2"],
+.mode-phone .main-content-area .op-grid,
+.mode-phone .main-content-area .cat-grid,
+.mode-phone .main-content-area .denominations-grid,
+.mode-phone .main-content-area .dlg-stats,
+.mode-phone .main-content-area .variant-editor-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.mode-phone .main-content-area .variant-editor-row > div:last-child {
+    grid-column: auto;
+    grid-row: auto;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.mode-phone .main-content-area .variant-editor-row > div:last-child button {
+    width: auto;
+    min-width: 44px;
+}
+
+.mode-phone .main-content-area [role="tablist"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    overflow-x: visible;
+}
+
+.mode-phone .main-content-area [role="tablist"] > button {
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    justify-content: flex-start;
+    overflow-wrap: anywhere;
+    text-align: left;
+    white-space: normal !important;
+}
+
+.mode-phone .phone-table-scroll td:last-child > div {
+    display: flex !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
 }

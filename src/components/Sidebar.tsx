@@ -103,7 +103,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Ventas, Facturación y Caja"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F1</span>
+            <span className="module-key-code module-key-shortcut">F1</span>
             <span className="module-icon-box icon-sales" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <rect width="18" height="13" x="3" y="4" rx="2"></rect>
@@ -131,7 +131,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Inventario, Tallas y Stock"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F2</span>
+            <span className="module-key-code module-key-shortcut">F2</span>
             <span className="module-icon-box icon-inventory" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m7.5 4.27 9 5.15"></path>
@@ -159,7 +159,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Apartados y Abonos de Clientes"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F3</span>
+            <span className="module-key-code module-key-shortcut">F3</span>
             <span className="module-icon-box icon-apartados" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="4" width="20" height="16" rx="2"></rect>
@@ -185,7 +185,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Fondo para gastos menores diarios"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F4</span>
+            <span className="module-key-code module-key-shortcut">F4</span>
             <span className="module-icon-box icon-caja-chica" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="6" width="20" height="12" rx="2"></rect>
@@ -212,7 +212,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Balance consolidado y análisis financiero"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F5</span>
+            <span className="module-key-code module-key-shortcut">F5</span>
             <span className="module-icon-box icon-reports" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 3v18h18"></path>
@@ -238,7 +238,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Arqueo de caja física y cierre de inventario valorizado"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F6</span>
+            <span className="module-key-code module-key-shortcut">F6</span>
             <span className="module-icon-box icon-cierre" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9"></circle>
@@ -264,7 +264,7 @@ export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: Sideb
             title="Jornadas, asuetos y días sin ventas"
             style={{ minHeight: isMobileDevice ? '52px' : '46px' }}
           >
-            <span className="module-key-code">F7</span>
+            <span className="module-key-code module-key-shortcut">F7</span>
             <span className="module-icon-box icon-calendar" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="5" width="18" height="16" rx="2"></rect>
