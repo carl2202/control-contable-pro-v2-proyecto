@@ -1,0 +1,48 @@
+{
+  "projectType": "webapp",
+  "setup": [],
+  "assertions": [
+    {
+      "name": "typescript-no-emit",
+      "kind": "process",
+      "command": "pnpm",
+      "args": ["exec", "tsc", "--noEmit"],
+      "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 180
+    },
+    {
+      "name": "production-build",
+      "kind": "process",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "tests-pass",
+      "kind": "process",
+      "command": "pnpm",
+      "args": ["test"],
+      "verificationMethod": "test-results",
+      "expected": "0",
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "app-home-200",
+      "kind": "http-probe",
+      "startCommand": "pnpm",
+      "startArgs": ["run", "dev"],
+      "env": {
+        "TURSO_DATABASE_URL": "file:./.tsupgrader/runtime-validation/responsive-validation.db",
+        "TURSO_AUTH_TOKEN": "responsive-validation-only",
+        "AUTO_BACKUP": "false"
+      },
+      "url": "http://localhost:3000/",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    }
+  ]
+}

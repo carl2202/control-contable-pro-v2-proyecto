@@ -1,0 +1,126 @@
+{
+  "planHash": "584e6731fc81d38fc18fc2af7ac3e67b55e7583ad53103665309524d40504544",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-11-20T03:36:47.4285493Z",
+  "retryCount": 2,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "typescript-no-emit",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "",
+        "durationMs": 1148
+      },
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "$ vite build\r\n\u001B[36mvite v8.3.5 \u001B[32mbuilding client environment for production...\u001B[36m\u001B[39m\r\ntransforming...\r\n\u2713 64 modules transformed.\r\nrendering chunks...\r\ncomputing gzip size...\r\ndist/index.html                   1.35 kB \u2502 gzip:   0.63 kB\r\ndist/assets/index-Cqjcp9z0.css   70.89 kB \u2502 gzip:  14.97 kB\r\ndist/assets/index-BhMTmXbk.js   447.92 kB \u2502 gzip: 114.54 kB\r\n\r\n\u001B[32m\u2713 built in 658ms\u001B[39m\r\n",
+        "durationMs": 1906
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "$ tsx --test server/security.test.ts server/businessDate.test.ts\r\n\u2714 business date follows El Salvador time instead of UTC (5.4139ms)\r\n\u2714 new credentials use salted scrypt and verify only the matching secret (211.6457ms)\r\n\u2714 legacy plaintext and SHA-256 credentials can be protected and verified (306.8598ms)\r\n\u2714 PIN lookup is stable, fixed-size, and distinct for different PINs (1.2738ms)\r\n\u2139 tests 4\r\n\u2139 suites 0\r\n\u2139 pass 4\r\n\u2139 fail 0\r\n\u2139 cancelled 0\r\n\u2139 skipped 0\r\n\u2139 todo 0\r\n\u2139 duration_ms 883.5933\r\n",
+        "durationMs": 1418,
+        "testResults": {
+          "testFramework": "unknown",
+          "runnerDetectedFrom": "none",
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": true
+        }
+      },
+      {
+        "name": "app-home-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!DOCTYPE html\u003E\n\u003Chtml lang=\u0022es\u0022\u003E\n\u003Chead\u003E\n  \u003Cscript type=\u0022module\u0022\u003Eimport { injectIntoGlobalHook } from \u0022/@react-refresh\u0022;\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () =\u003E {};\nwindow.$RefreshSig$ = () =\u003E (type) =\u003E type;\u003C/script\u003E\n\n  \u003Cscript type=\u0022module\u0022 src=\u0022/@vite/client\u0022\u003E\u003C/script\u003E\n\n    \u003Cmeta charset=\u0022UTF-8\u0022\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022\u003E\n    \u003Ctitle\u003EControl Contable Pro \u2022 Tienda de Ropa\u003C/title\u003E\n\n    \u003C!-- PWA \u0026 Mobile Meta Tags --\u003E\n    \u003Clink rel=\u0022manifest\u0022 href=\u0022/manifest.json\u0022\u003E\n    \u003Cmeta name=\u0022theme-color\u0022 content=\u0022#4F6F52\u0022\u003E\n    \u003Cmeta name=\u0022mobile-web-app-capable\u0022 content=\u0022yes\u0022\u003E\n    \u003Cmeta name=\u0022apple-mobile-web-app-capable\u0022 content=\u0022yes\u0022\u003E\n    \u003Cmeta name=\u0022apple-mobile-web-app-status-bar-style\u0022 content=\u0022default\u0022\u003E\n    \u003Cmeta name=\u0022apple-mobile-web-app-title\u0022 content=\u0022ContablePro\u0022\u003E\n    \u003Clink rel=\u0022apple-touch-icon\u0022 href=\u0022/icon-192.svg\u0022\u003E\n    \u003Clink rel=\u0022icon\u0022 type=\u0022image/svg\u002Bxml\u0022 href=\u0022/icon-192.svg\u0022\u003E\n\n    \u003C!-- Tipograf\u00EDas de Google Fonts --\u003E\n    \u003Clink rel=\u0022preconnect\u0022 href=\u0022https://fonts.googleapis.com\u0022\u003E\n    \u003Clink rel=\u0022preconnect\u0022 href=\u0022https://fonts.gstatic.com\u0022 crossorigin\u003E\n    \u003Clink href=\u0022https://fonts.googleapis.com/css2?family=IBM\u002BPlex\u002BSans:wght@400;500;600;700\u0026family=IBM\u002BPlex\u002BMono:wght@400;500;600\u0026family=Source\u002BSerif\u002B4:opsz,wght@8..60,500;8..60,600;8..60,700\u0026display=swap\u0022 rel=\u0022stylesheet\u0022\u003E\n\n    \u003C!-- Hojas de estilo --\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/variables.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/layout.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/buttons.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/dashboard.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/forms.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/tables.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/widgets.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/feedback.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/calendar.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/cierre.css\u0022\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 href=\u0022./css/responsive.css\u0022\u003E\n\u003C/head\u003E\n\u003Cbody\u003E\n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\n    \u003Cscript type=\u0022module\u0022 src=\u0022/src/main.tsx\u0022\u003E\u003C/script\u003E\n\u003C/body\u003E\n\u003C/html\u003E\n\n--- server output ---\n$ tsx server.ts\r\n\u25C7 injected env (0) from .env // tip: \u2318 suppress logs { quiet: true }\r\n\uD83D\uDE80 Control Contable Pro server running on http://0.0.0.0:3000 (development)\r\n",
+        "durationMs": 3644
+      }
+    ],
+    "executions": [
+      {
+        "source": "typescript-no-emit",
+        "resolvedExecutable": "C:\\Users\\migue\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "exec",
+          "tsc",
+          "--noEmit"
+        ],
+        "cwd": "C:\\Users\\migue\\Downloads\\control-contable-pro-v2",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "production-build",
+        "resolvedExecutable": "C:\\Users\\migue\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "C:\\Users\\migue\\Downloads\\control-contable-pro-v2",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Users\\migue\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Users\\migue\\Downloads\\control-contable-pro-v2",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "app-home-200",
+        "resolvedExecutable": "C:\\Users\\migue\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "cwd": "C:\\Users\\migue\\Downloads\\control-contable-pro-v2",
+        "env": {
+          "TURSO_DATABASE_URL": "file:./.tsupgrader/runtime-validation/responsive-validation.db",
+          "TURSO_AUTH_TOKEN": "\u003Credacted\u003E",
+          "AUTO_BACKUP": "false"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

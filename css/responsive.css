@@ -467,7 +467,7 @@
     }
 }
 
-@media (max-width: 430px) {
+@media (min-width: 391px) and (max-width: 430px) {
     .header-device-switcher [role="group"] button {
         padding: 4px 5px !important;
     }
@@ -489,6 +489,81 @@
     .metric-card .m-icon {
         width: 30px;
         height: 30px;
+    }
+}
+
+@media (max-width: 560px) {
+    .variant-editor-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) 40px !important;
+        align-items: stretch;
+        gap: 8px !important;
+    }
+
+    .variant-editor-row > div {
+        min-width: 0;
+    }
+
+    .variant-editor-row > div:last-child {
+        grid-column: 3;
+        grid-row: 1 / span 3;
+        display: grid;
+        place-items: center;
+    }
+
+    .variant-editor-row > div:last-child button {
+        width: 100%;
+        min-height: 44px;
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+
+    .variant-editor-row input {
+        width: 100%;
+        min-width: 0;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+
+    .card-box > .flex.justify-between {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .card-box > .flex.justify-between > * {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .cookie-consent-banner {
+        gap: 8px !important;
+        padding: 12px !important;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .cookie-consent-banner > p {
+        flex-basis: calc(100% - 32px);
+        min-width: 0 !important;
+    }
+
+    .cookie-consent-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .cookie-consent-actions > button {
+        flex: 1 1 140px;
+    }
+}
+
+@media (max-width: 390px) {
+    .cal-grid {
+        gap: 3px;
+    }
+
+    .cal-day {
+        min-height: 52px;
+        padding: 4px;
     }
 }
 
@@ -535,5 +610,19 @@
 
     .no-flex-gap .dlg-body > * + * {
         margin-top: 12px;
+    }
+}
+
+@media (max-width: 360px) {
+    .op-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .container > header {
+        padding: 10px;
+    }
+
+    .metric-card .value {
+        font-size: 1.05rem;
     }
 }

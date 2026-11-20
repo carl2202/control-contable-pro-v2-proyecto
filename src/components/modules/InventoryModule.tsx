@@ -369,7 +369,7 @@ export function InventoryModule({ onRefreshData }: InventoryModuleProps) {
                 {variants.map((v, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-6 gap-1.5 items-center bg-[#F2F6EE] p-2 rounded-lg border border-[#CBDCC5]"
+                    className="variant-editor-row grid grid-cols-6 gap-1.5 items-center bg-[#F2F6EE] p-2 rounded-lg border border-[#CBDCC5]"
                   >
                     <div>
                       <input

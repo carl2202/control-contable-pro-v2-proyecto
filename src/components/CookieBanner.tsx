@@ -57,6 +57,7 @@ export default function CookieBanner() {
       role="dialog"
       aria-label="Banner de consentimiento de cookies"
       aria-modal="false"
+      className="cookie-consent-banner"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -108,7 +109,7 @@ export default function CookieBanner() {
         No se usan cookies de rastreo ni publicidad.
       </p>
 
-      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
+      <div className="cookie-consent-actions" style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
         {/* Botón Aceptar Cookies */}
         <button
           type="button"
