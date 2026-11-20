@@ -23,7 +23,7 @@ export function UserManagementPanel() {
   const [newUsername, setNewUsername] = useState<string>('');
   const [newUserPass, setNewUserPass] = useState<string>('');
   const [newUserDisplayName, setNewUserDisplayName] = useState<string>('');
-  const [newUserPin, setNewUserPin] = useState<string>('0000');
+  const [newUserPin, setNewUserPin] = useState<string>('');
   const [isCreatingUser, setIsCreatingUser] = useState<boolean>(false);
 
   const loadUsers = useCallback(async () => {
@@ -58,8 +58,8 @@ export function UserManagementPanel() {
     e.preventDefault();
     if (!selectedUser) return;
 
-    if (newPassword.length < 4) {
-      showToast('La nueva contraseña debe tener al menos 4 caracteres.', true);
+    if (!/^\d{4,6}$/.test(newPassword)) {
+      showToast('El PIN debe contener entre 4 y 6 dígitos.', true);
       return;
     }
 
@@ -71,7 +71,7 @@ export function UserManagementPanel() {
     try {
       setIsSubmittingPass(true);
       await UsersService.resetPassword(selectedUser.id, newPassword);
-      showToast(`Contraseña de ${selectedUser.displayName} actualizada con éxito.`, false, 'success');
+      showToast(`PIN de ${selectedUser.displayName} actualizado con éxito.`, false, 'success');
       handleCloseReset();
       loadUsers();
     } catch (err: any) {
@@ -93,6 +93,10 @@ export function UserManagementPanel() {
       showToast('La contraseña debe tener al menos 4 caracteres.', true);
       return;
     }
+    if (!/^\d{4,6}$/.test(newUserPin)) {
+      showToast('El PIN debe contener entre 4 y 6 dígitos.', true);
+      return;
+    }
 
     try {
       setIsCreatingUser(true);
@@ -102,7 +106,7 @@ export function UserManagementPanel() {
           username: newUsername.trim(),
           password: newUserPass.trim(),
           displayName: newUserDisplayName.trim() || `${newUsername.trim()} (Cajero)`,
-          pin: newUserPin.trim() || '0000',
+          pin: newUserPin,
         }),
       });
 
@@ -111,7 +115,7 @@ export function UserManagementPanel() {
       setNewUsername('');
       setNewUserPass('');
       setNewUserDisplayName('');
-      setNewUserPin('0000');
+      setNewUserPin('');
       loadUsers();
     } catch (err: any) {
       showToast(err.message || 'Error al crear el usuario.', true);
@@ -240,7 +244,7 @@ export function UserManagementPanel() {
           <div className="dlg" style={{ maxWidth: '420px', width: '100%', background: 'var(--surface)' }}>
             <div className="dlg-head">
               <h3 className="dlg-title" style={{ fontSize: '1rem', color: 'var(--text-main)', margin: 0 }}>
-                Restablecer Contraseña: {selectedUser.displayName}
+                Restablecer PIN: {selectedUser.displayName}
               </h3>
               <button
                 type="button"
@@ -254,15 +258,16 @@ export function UserManagementPanel() {
             <form onSubmit={handleSubmitReset} className="dlg-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
-                  Nueva Contraseña / PIN (mínimo 4 caracteres)
+                  Nuevo PIN (4 a 6 dígitos)
                 </label>
                 <input
                   type="password"
+                  inputMode="numeric"
+                  maxLength={6}
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Ingrese nueva clave..."
+                  onChange={(e) => setNewPassword(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Ingrese el nuevo PIN"
                   required
-                  minLength={4}
                   className="input-field"
                   style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
                 />
@@ -270,15 +275,16 @@ export function UserManagementPanel() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
-                  Confirmar Contraseña
+                  Confirmar PIN
                 </label>
                 <input
                   type="password"
+                  inputMode="numeric"
+                  maxLength={6}
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repita la clave..."
+                  onChange={(e) => setConfirmPassword(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Repita el nuevo PIN"
                   required
-                  minLength={4}
                   className="input-field"
                   style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
                 />
@@ -299,7 +305,7 @@ export function UserManagementPanel() {
                   className="btn btn-primary"
                   style={{ minHeight: '44px', padding: '0 16px' }}
                 >
-                  {isSubmittingPass ? 'Guardando...' : 'Actualizar Clave'}
+                  {isSubmittingPass ? 'Guardando...' : 'Actualizar PIN'}
                 </button>
               </div>
             </form>
@@ -374,15 +380,17 @@ export function UserManagementPanel() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
-                  PIN Rápido (4 dígitos para login táctil)
+                  PIN Rápido (4 a 6 dígitos para login)
                 </label>
                 <input
-                  type="text"
+                  type="password"
                   inputMode="decimal"
-                  maxLength={4}
+                  maxLength={6}
                   value={newUserPin}
                   onChange={(e) => setNewUserPin(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="0000"
+                  placeholder="4 a 6 dígitos"
+                  required
+                  minLength={4}
                   className="input-field"
                   style={{ width: '100%', minHeight: '44px', padding: '0 12px', fontFamily: 'var(--font-mono)' }}
                 />

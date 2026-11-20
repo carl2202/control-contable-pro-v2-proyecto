@@ -5,7 +5,6 @@ import { db, dbReady, isRemoteDatabase } from './db.js';
 const BACKUP_DIR = path.resolve(process.cwd(), 'data', 'backups');
 const BACKUP_TABLES = [
   'users',
-  'sessions',
   'active_dates',
   'movements',
   'inventory_items',
@@ -15,23 +14,37 @@ const BACKUP_TABLES = [
   'cierres_inventario',
   'cierres_caja',
   'calendar_days',
-  'voucher_sequences',
   'cash_registers',
-  'login_challenges',
   'audit_log',
-  'otp_codes',
 ];
+
+function tableQuery(name: string, tenantId?: number): { sql: string; args: number[] } {
+  if (tenantId === undefined) {
+    return { sql: `SELECT * FROM "${name}"`, args: [] };
+  }
+  if (name === 'sessions') {
+    return {
+      sql: 'SELECT * FROM sessions WHERE user_id IN (SELECT id FROM users WHERE COALESCE(tenant_id, 1) = ?)',
+      args: [tenantId],
+    };
+  }
+  return {
+    sql: `SELECT * FROM "${name}" WHERE COALESCE(tenant_id, 1) = ?`,
+    args: [tenantId],
+  };
+}
 
 export async function ensureBackupDir(): Promise<string> {
   await fs.mkdir(BACKUP_DIR, { recursive: true });
   return BACKUP_DIR;
 }
 
-export async function createDatabaseBackup(): Promise<string> {
+export async function createDatabaseBackup(tenantId?: number): Promise<string> {
   await dbReady;
   await ensureBackupDir();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filePath = path.join(BACKUP_DIR, `control-contable-${stamp}.json`);
+  const scope = tenantId === undefined ? 'system' : `tenant-${tenantId}`;
+  const filePath = path.join(BACKUP_DIR, `control-contable-${scope}-${stamp}.json`);
   const tables = [];
 
   for (const name of BACKUP_TABLES) {
@@ -39,24 +52,27 @@ export async function createDatabaseBackup(): Promise<string> {
       'SELECT sql FROM sqlite_master WHERE type = ? AND name = ?'
     ).get('table', name) as { sql: string } | undefined;
     if (!schema) continue;
-    const rows = await db.prepare(`SELECT * FROM "${name}"`).all();
+    const query = tableQuery(name, tenantId);
+    const rows = await db.prepare(query.sql).all(...query.args);
     tables.push({ name, schema: schema.sql, rows });
   }
 
   await fs.writeFile(filePath, JSON.stringify({
     format: 'control-contable-libsql-backup-v1',
     database: isRemoteDatabase ? 'turso' : 'sqlite-local',
+    tenantId: tenantId ?? null,
     createdAt: new Date().toISOString(),
     tables,
   }), 'utf8');
   return filePath;
 }
 
-export async function listDatabaseBackups(): Promise<Array<{ name: string; size: number; createdAt: string }>> {
+export async function listDatabaseBackups(tenantId: number): Promise<Array<{ name: string; size: number; createdAt: string }>> {
   await ensureBackupDir();
   const files = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
   const backups = await Promise.all(files
-    .filter((entry) => entry.isFile() && /^control-contable-.+\.(?:json|sqlite3|db)$/i.test(entry.name))
+    .filter((entry) => entry.isFile()
+      && new RegExp(`^control-contable-tenant-${tenantId}-[a-z0-9T-]+\\.json$`, 'i').test(entry.name))
     .map(async (entry) => {
       const stat = await fs.stat(path.join(BACKUP_DIR, entry.name));
       return { name: entry.name, size: stat.size, createdAt: stat.mtime.toISOString() };
@@ -64,8 +80,8 @@ export async function listDatabaseBackups(): Promise<Array<{ name: string; size:
   return backups.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function getBackupPath(name: string): Promise<string | null> {
-  if (!/^[a-zA-Z0-9_.-]+$/.test(name) || name.includes('..')) return null;
+export async function getBackupPath(name: string, tenantId: number): Promise<string | null> {
+  if (!new RegExp(`^control-contable-tenant-${tenantId}-[a-z0-9T-]+\\.json$`, 'i').test(name)) return null;
   const filePath = path.join(await ensureBackupDir(), name);
   try {
     const stat = await fs.stat(filePath);

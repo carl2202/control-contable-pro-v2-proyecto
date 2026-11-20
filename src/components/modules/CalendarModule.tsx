@@ -3,6 +3,7 @@ import { CalendarMap, CalendarStatus } from '../../types';
 import { CalendarService } from '../../services/calendar.service';
 import { useFeedback } from '../../context/FeedbackContext';
 import { MetricCard } from '../MetricCard';
+import { getBusinessDate } from '../../utils/businessDate';
 
 interface CalendarModuleProps {
   onRefreshData?: () => void;
@@ -240,7 +241,7 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
             }
 
             const info = calendarMap[d.dateStr];
-            const isToday = d.dateStr === new Date().toISOString().slice(0, 10);
+            const isToday = d.dateStr === getBusinessDate();
 
             let bgClass = 'bg-[#F7F8F3] border-[#D7DDCF] hover:bg-[#F2F5EC] hover:border-[#4F6F52]';
             let badgeClass = 'badge badge-sindefinir';

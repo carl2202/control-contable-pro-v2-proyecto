@@ -1,26 +1,53 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActiveModule } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
 
 interface SidebarProps {
   activeModule: ActiveModule;
+  isOpen: boolean;
+  onClose: () => void;
   onSelectModule: (mod: ActiveModule) => void;
 }
 
-export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
+export function Sidebar({ activeModule, isOpen, onClose, onSelectModule }: SidebarProps) {
   const { isOwner } = useAuth();
   const { isMobile: isMobileDevice } = useDevice();
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   return (
-    <aside
-      className="modules-sidebar-right"
-      aria-label="Navegación de Módulos"
-      style={{
-        width: '100%',
-        maxWidth: isMobileDevice ? '100%' : undefined,
-      }}
-    >
+    <>
+      {isOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          onClick={onClose}
+          aria-label="Cerrar menú de módulos"
+        />
+      )}
+      <aside
+        className={`modules-sidebar-right${isOpen ? ' mobile-drawer-open' : ''}`}
+        aria-label="Navegación de Módulos"
+        aria-modal={isOpen ? true : undefined}
+        role={isOpen ? 'dialog' : undefined}
+        style={{
+          width: '100%',
+          maxWidth: isMobileDevice ? '100%' : undefined,
+        }}
+      >
       <div className="sidebar-panel-card" style={{ padding: isMobileDevice ? '12px' : '16px' }}>
         <div className="sidebar-header" style={{ marginBottom: isMobileDevice ? '10px' : '14px' }}>
           <div className="sidebar-brand-badge">
@@ -40,6 +67,16 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
               <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
             </svg>
             <span style={{ letterSpacing: '0.04em' }}>MÓDULOS DEL SISTEMA</span>
+            <button
+              type="button"
+              className="sidebar-close-button"
+              onClick={onClose}
+              aria-label="Cerrar menú de módulos"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="m18 6-12 12M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <h2 className="sidebar-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             Panel de Control
@@ -287,7 +324,8 @@ export function Sidebar({ activeModule, onSelectModule }: SidebarProps) {
           <div className="system-meta-text">El Salvador • IVA 13% Incl.</div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

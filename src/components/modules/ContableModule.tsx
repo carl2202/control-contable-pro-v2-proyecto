@@ -8,6 +8,7 @@ import { CalendarService } from '../../services/calendar.service';
 import { useAuth } from '../../context/AuthContext';
 import { useFeedback } from '../../context/FeedbackContext';
 import { MetricCard } from '../MetricCard';
+import { getBusinessDate } from '../../utils/businessDate';
 
 interface ContableModuleProps {
   onRefreshData?: () => void;
@@ -17,7 +18,7 @@ export function ContableModule({ onRefreshData }: ContableModuleProps) {
   const { isOwner, user } = useAuth();
   const { showToast, confirm } = useFeedback();
 
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayStr = useMemo(() => getBusinessDate(), []);
 
   // State
   const [activeTab, setActiveTab] = useState<string>(todayStr);

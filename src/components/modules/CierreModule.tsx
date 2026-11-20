@@ -6,6 +6,7 @@ import { MovementsService } from '../../services/movements.service';
 import { useAuth } from '../../context/AuthContext';
 import { useFeedback } from '../../context/FeedbackContext';
 import { MetricCard } from '../MetricCard';
+import { getBusinessDate } from '../../utils/businessDate';
 
 interface CierreModuleProps {
   onRefreshData?: () => void;
@@ -16,7 +17,7 @@ export function CierreModule({ onRefreshData }: CierreModuleProps) {
   const { showToast, confirm } = useFeedback();
 
   const [activeSubTab, setActiveSubTab] = useState<'caja' | 'inventario'>('caja');
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayStr = useMemo(() => getBusinessDate(), []);
 
   // History state
   const [cajaClosures, setCajaClosures] = useState<CierreCaja[]>([]);

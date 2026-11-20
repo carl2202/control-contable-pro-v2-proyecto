@@ -2,6 +2,8 @@ import { createClient, type Client, type Transaction, type InValue, type ResultS
 import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getBusinessDate } from './businessDate.js';
+import { hashCredential, isProtectedCredential, pinLookup, protectLegacyPassword } from './security.js';
 
 type RequestDatabaseContext = { transaction?: Transaction };
 type QueryResult = Omit<ResultSet, 'lastInsertRowid'> & {
@@ -106,7 +108,7 @@ export function withDatabaseContext(req: unknown, res: unknown, next: (error?: u
 const schema = `
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
-  pin TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('dueno', 'empleado')), display_name TEXT NOT NULL,
+  pin TEXT NOT NULL, pin_lookup TEXT, role TEXT NOT NULL CHECK(role IN ('dueno', 'empleado')), display_name TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP, tenant_id INTEGER NOT NULL DEFAULT 1,
   active INTEGER NOT NULL DEFAULT 1, email TEXT, phone TEXT
 );
@@ -123,7 +125,7 @@ CREATE TABLE IF NOT EXISTS movements (
   id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
   type TEXT NOT NULL CHECK(type IN ('venta', 'compra', 'cajachica', 'luz', 'agua', 'internet')),
   "desc" TEXT NOT NULL, amount REAL NOT NULL, tax REAL NOT NULL, doc TEXT NOT NULL,
-  voucher_code TEXT, voucher_recipient TEXT, time TEXT NOT NULL, items_json TEXT, cc_id INTEGER,
+  voucher_code TEXT, voucher_recipient TEXT, time TEXT NOT NULL, items_json TEXT, cc_id INTEGER, apartado_id INTEGER,
   user_role TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, tenant_id INTEGER NOT NULL DEFAULT 1,
   register_id INTEGER, debit REAL NOT NULL DEFAULT 0, credit REAL NOT NULL DEFAULT 0,
   voided INTEGER NOT NULL DEFAULT 0
@@ -181,7 +183,7 @@ CREATE TABLE IF NOT EXISTS login_challenges (
 );
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, entity TEXT NOT NULL, entity_id TEXT,
-  detail TEXT, user_role TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  detail TEXT, user_role TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, tenant_id INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS otp_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT, target TEXT NOT NULL, code TEXT NOT NULL, user_id INTEGER,
@@ -202,15 +204,18 @@ async function ensureColumn(table: string, column: string, definition: string): 
 }
 
 async function migrateExistingSchema(): Promise<void> {
+  const hadAuditTenant = (await tableColumns('audit_log')).has('tenant_id');
   const columns: Array<[string, string, string]> = [
     ['sessions', 'last_seen_at', 'last_seen_at DATETIME'],
     ['movements', 'register_id', 'register_id INTEGER'],
     ['movements', 'debit', 'debit REAL NOT NULL DEFAULT 0'],
     ['movements', 'credit', 'credit REAL NOT NULL DEFAULT 0'],
     ['movements', 'voided', 'voided INTEGER NOT NULL DEFAULT 0'],
+    ['movements', 'apartado_id', 'apartado_id INTEGER'],
     ['caja_chica', 'register_id', 'register_id INTEGER'],
     ['caja_chica', 'voided', 'voided INTEGER NOT NULL DEFAULT 0'],
     ['users', 'active', 'active INTEGER NOT NULL DEFAULT 1'],
+    ['users', 'pin_lookup', 'pin_lookup TEXT'],
     ['users', 'email', 'email TEXT'],
     ['users', 'phone', 'phone TEXT'],
     ['users', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1'],
@@ -225,13 +230,32 @@ async function migrateExistingSchema(): Promise<void> {
     ['calendar_days', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1'],
     ['cash_registers', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1'],
     ['active_dates', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1'],
+    ['audit_log', 'tenant_id', 'tenant_id INTEGER NOT NULL DEFAULT 1'],
   ];
   for (const [table, column, definition] of columns) {
     await ensureColumn(table, column, definition);
   }
 
-  await db.prepare("UPDATE users SET email = 'admin@tienda.com', phone = '70001122' WHERE role = 'dueno' AND (email IS NULL OR email = '')").run();
-  await db.prepare("UPDATE users SET email = 'cajero@tienda.com', phone = '71112233' WHERE role = 'empleado' AND (email IS NULL OR email = '')").run();
+  if (!hadAuditTenant) {
+    await db.prepare('UPDATE audit_log SET tenant_id = 0').run();
+    const auditEntityTables = ['users', 'cash_registers', 'movements', 'caja_chica'];
+    for (const entity of auditEntityTables) {
+      await db.prepare(`
+        UPDATE audit_log
+        SET tenant_id = (
+          SELECT COALESCE(tenant_id, 1) FROM "${entity}"
+          WHERE id = CAST(audit_log.entity_id AS INTEGER)
+        )
+        WHERE entity = ? AND entity_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM "${entity}" WHERE id = CAST(audit_log.entity_id AS INTEGER))
+      `).run(entity);
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    await db.prepare("UPDATE users SET email = NULL WHERE email IN ('admin@tienda.com', 'cajero@tienda.com')").run();
+    await db.prepare("UPDATE users SET phone = NULL WHERE phone IN ('70001122', '71112233')").run();
+  }
 
   await migrateCompositeKey('active_dates', ['date', 'created_at'], `
     CREATE TABLE active_dates__new (
@@ -291,15 +315,21 @@ async function migrateCompositeKey(
 }
 
 async function seedData(): Promise<void> {
+  if (process.env.NODE_ENV === 'production') return;
+
   const users = await db.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number };
   if (Number(users.count) === 0) {
-    const insert = db.prepare(`INSERT INTO users (username,password_hash,pin,role,display_name,tenant_id)
-      VALUES (?,?,?,?,?,?)`);
-    await insert.run('dueno', 'admin123', '1234', 'dueno', 'Don Roberto (Dueño / Admin)', 1);
-    await insert.run('empleado', 'caja123', '0000', 'empleado', 'Ana Martínez (Cajera / Empleada)', 1);
+    const ownerPassword = await hashCredential('admin123');
+    const employeePassword = await hashCredential('caja123');
+    const ownerPin = await hashCredential('1234');
+    const employeePin = await hashCredential('0000');
+    const insert = db.prepare(`INSERT INTO users (username,password_hash,pin,pin_lookup,role,display_name,tenant_id,email,phone)
+      VALUES (?,?,?,?,?,?,?,?,?)`);
+    await insert.run('dueno', ownerPassword, ownerPin, pinLookup('1234'), 'dueno', 'Don Roberto (Dueño / Admin)', 1, 'admin@tienda.com', '70001122');
+    await insert.run('empleado', employeePassword, employeePin, pinLookup('0000'), 'empleado', 'Ana Martínez (Cajera / Empleada)', 1, 'cajero@tienda.com', '71112233');
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getBusinessDate();
   await db.prepare('INSERT OR IGNORE INTO active_dates (date, tenant_id) VALUES (?, 1)').run(today);
 
   const inventory = await db.prepare('SELECT COUNT(*) AS count FROM inventory_items WHERE tenant_id = 1').get() as { count: number };
@@ -336,15 +366,56 @@ export const dbReady: Promise<void> = (async () => {
   if (!isRemoteDatabase) await db.exec('PRAGMA foreign_keys = ON');
   await db.exec(schema);
   await migrateExistingSchema();
+  await migrateLegacyCredentials();
   await seedData();
 })();
 
+async function migrateLegacyCredentials(): Promise<void> {
+  const users = await db.prepare(
+    'SELECT id, username, password_hash, pin, pin_lookup, active FROM users'
+  ).all() as Array<{ id: number; username: string; password_hash: string; pin: string; pin_lookup: string | null; active: number }>;
+
+  for (const user of users) {
+    const isDemoOwner = user.username === 'dueno'
+      && user.password_hash === 'admin123'
+      && user.pin === '1234';
+    const isDemoEmployee = user.username === 'empleado'
+      && user.password_hash === 'caja123'
+      && user.pin === '0000';
+    const passwordHash = isProtectedCredential(user.password_hash)
+      ? user.password_hash
+      : await protectLegacyPassword(user.password_hash);
+    const pinHash = isProtectedCredential(user.pin)
+      ? user.pin
+      : await hashCredential(user.pin);
+    const pinLookupValue = user.pin_lookup || (!isProtectedCredential(user.pin) ? pinLookup(user.pin) : null);
+    const active = process.env.NODE_ENV === 'production' && (isDemoOwner || isDemoEmployee)
+      ? 0
+      : user.active;
+
+    if (passwordHash !== user.password_hash || pinHash !== user.pin
+      || pinLookupValue !== user.pin_lookup || active !== user.active) {
+      await db.prepare(
+        'UPDATE users SET password_hash = ?, pin = ?, pin_lookup = ?, active = ? WHERE id = ?'
+      ).run(passwordHash, pinHash, pinLookupValue, active, user.id);
+    }
+  }
+}
+
 export async function getNextVoucherNumber(): Promise<string> {
-  const row = await db.prepare('SELECT next_val FROM voucher_sequences WHERE name = ?').get('vale') as { next_val: number } | undefined;
-  const next = Number(row?.next_val || 1);
-  await db.prepare(`INSERT INTO voucher_sequences (name,next_val) VALUES ('vale',?)
-    ON CONFLICT(name) DO UPDATE SET next_val=excluded.next_val`).run(next + 1);
-  return `VLE-${String(next).padStart(4, '0')}`;
+  return db.transaction(async (transaction) => {
+    const row = await transaction.execute({
+      sql: 'SELECT next_val FROM voucher_sequences WHERE name = ?',
+      args: ['vale'],
+    });
+    const next = Number(row.rows[0]?.next_val || 1);
+    await transaction.execute({
+      sql: `INSERT INTO voucher_sequences (name,next_val) VALUES ('vale',?)
+        ON CONFLICT(name) DO UPDATE SET next_val=excluded.next_val`,
+      args: [next + 1],
+    });
+    return `VLE-${String(next).padStart(4, '0')}`;
+  });
 }
 
 export async function ensureCashRegisters(): Promise<void> {

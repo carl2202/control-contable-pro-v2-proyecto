@@ -25,6 +25,7 @@ function MainApp() {
   const [activeModule, setActiveModule] = useState<ActiveModule>('contable');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   const { user, loading, isOwner } = useAuth();
   const { showToast } = useFeedback();
@@ -228,6 +229,7 @@ function MainApp() {
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onExportCSV={handleExportBackup}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
       />
 
       {/* Rejilla principal */}
@@ -246,7 +248,12 @@ function MainApp() {
         {/* Barra lateral de navegación F1–F7 + Admin */}
         <Sidebar
           activeModule={activeModule}
-          onSelectModule={(mod) => setActiveModule(mod)}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onSelectModule={(mod) => {
+            setActiveModule(mod);
+            setIsSidebarOpen(false);
+          }}
         />
       </div>
 

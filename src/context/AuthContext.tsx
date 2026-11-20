@@ -33,11 +33,16 @@ interface AuthContextType {
   /** Atajo: true si el usuario tiene rol 'empleado'. */
   isEmployee: boolean;
   /** Autentica con un PIN y un rol; devuelve {success, error?}. */
-  loginWithPin: (pin: string, role?: Role, username?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithPin: (
+    pin: string,
+    role: Role | undefined,
+    username: string | undefined,
+    challenge: { id: string; answer: string }
+  ) => Promise<{ success: boolean; error?: string }>;
   /** Autentica sin contraseña mediante código OTP por correo o teléfono. */
   loginWithOtp: (target: string, code: string) => Promise<{ success: boolean; error?: string }>;
   /** Registra un nuevo negocio y usuario dueño en la nube con aislamiento de datos. */
-  registerUser: (data: { username: string; password: string; pin: string; businessName: string; email?: string; phone?: string }) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (data: { username: string; password: string; pin: string; businessName: string; email?: string; phone?: string }) => Promise<{ success: boolean; error?: string; employeeUsername?: string; employeePin?: string }>;
   /** Cierra la sesión actual limpiando token y usuario. */
   logout: () => Promise<void>;
   /** Refresca los datos del usuario desde el servidor. */
@@ -103,10 +108,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithPin = async (
     pin: string,
     role?: Role,
-    username?: string
+    username?: string,
+    challenge?: { id: string; answer: string }
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const data = await AuthService.login({ pin, role, username });
+      if (!challenge) return { success: false, error: 'Debe completar la verificación de seguridad.' };
+      const data = await AuthService.login({
+        pin,
+        role,
+        username,
+        challengeId: challenge.id,
+        challengeAnswer: challenge.answer,
+      });
       setUser(data.user);
       setToken(data.token);
       return { success: true };
@@ -144,12 +157,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     businessName: string;
     email?: string;
     phone?: string;
-  }): Promise<{ success: boolean; error?: string }> => {
+  }): Promise<{ success: boolean; error?: string; employeeUsername?: string; employeePin?: string }> => {
     try {
       const res = await AuthService.register(data);
       setUser(res.user);
       setToken(res.token);
-      return { success: true };
+      return {
+        success: true,
+        employeeUsername: res.employeeUsername,
+        employeePin: res.employeePin,
+      };
     } catch (err: any) {
       return {
         success: false,

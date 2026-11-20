@@ -4,6 +4,7 @@ import { ApartadosService } from '../services/apartados.service';
 import { CajaChicaService } from '../services/cajaChica.service';
 import { CierresService } from '../services/cierres.service';
 import { CalendarService } from '../services/calendar.service';
+import { getBusinessDate } from './businessDate';
 
 export async function exportComprehensiveBackupCSV() {
   const [movements, inventory, apartados, cajaChica, cajaClosures, invClosures, calendar] =
@@ -109,7 +110,7 @@ export async function exportComprehensiveBackupCSV() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  const nowStr = new Date().toISOString().slice(0, 10);
+  const nowStr = getBusinessDate();
   link.setAttribute('download', `Control_Contable_Respaldo_${nowStr}.csv`);
   document.body.appendChild(link);
   link.click();

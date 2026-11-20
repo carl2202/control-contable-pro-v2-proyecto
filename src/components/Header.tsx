@@ -41,9 +41,8 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="btn btn-outline"
+              className="btn btn-outline header-menu-toggle"
               style={{
-                display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 minWidth: '40px',
@@ -78,7 +77,9 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
           <DarkModeToggle />
 
           {/* Selector de dispositivo (Computadora / Teléfono) */}
-          <DeviceSwitcher compact />
+          <div className="header-device-switcher">
+            <DeviceSwitcher compact />
+          </div>
         </div>
 
         {/* Título principal con ícono SVG de tienda */}
@@ -126,14 +127,14 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
               color: '#FFFFFF',
               borderRadius: 'var(--radius-md)',
             }}
-            title="Búsqueda rápida en el sistema (Ctrl + K)"
+            title="Búsqueda rápida en el sistema"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <span>Buscar</span>
-            <kbd
+            <kbd className="header-search-shortcut"
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.68rem',
@@ -152,6 +153,7 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
         {user ? (
           /* ── Usuario autenticado: insignia de rol + botones ── */
           <div
+            className="header-user-card"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -208,45 +210,47 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={onOpenLogin}
-              style={{
-                fontSize: '0.7rem',
-                padding: '4px 8px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'rgba(255,255,255,0.14)',
-                border: '1px solid rgba(255,255,255,0.28)',
-                color: '#E1EBDC',
-                cursor: 'pointer',
-                transition: 'var(--transition-smooth)',
-                whiteSpace: 'nowrap',
-                minHeight: '32px',
-              }}
-              title="Cambiar de usuario o rol"
-            >
-              Cambiar Rol
-            </button>
+            <div className="header-user-actions">
+              <button
+                type="button"
+                onClick={onOpenLogin}
+                style={{
+                  fontSize: '0.7rem',
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255,255,255,0.14)',
+                  border: '1px solid rgba(255,255,255,0.28)',
+                  color: '#E1EBDC',
+                  cursor: 'pointer',
+                  transition: 'var(--transition-smooth)',
+                  whiteSpace: 'nowrap',
+                  minHeight: '32px',
+                }}
+                title="Cambiar de usuario o rol"
+              >
+                Cambiar Rol
+              </button>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={{
-                fontSize: '0.7rem',
-                padding: '4px 8px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'rgba(178,96,63,0.25)',
-                border: '1px solid rgba(178,96,63,0.5)',
-                color: '#FED7C8',
-                cursor: 'pointer',
-                transition: 'var(--transition-smooth)',
-                whiteSpace: 'nowrap',
-                minHeight: '32px',
-              }}
-              title="Cerrar sesión actual"
-            >
-              Salir
-            </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  fontSize: '0.7rem',
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(178,96,63,0.25)',
+                  border: '1px solid rgba(178,96,63,0.5)',
+                  color: '#FED7C8',
+                  cursor: 'pointer',
+                  transition: 'var(--transition-smooth)',
+                  whiteSpace: 'nowrap',
+                  minHeight: '32px',
+                }}
+                title="Cerrar sesión actual"
+              >
+                Salir
+              </button>
+            </div>
           </div>
         ) : (
           <button

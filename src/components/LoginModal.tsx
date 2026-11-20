@@ -33,6 +33,9 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
   const [pin, setPin] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loginChallenge, setLoginChallenge] = useState<{ id: string; prompt: string } | null>(null);
+  const [challengeAnswer, setChallengeAnswer] = useState<string>('');
+  const [challengeError, setChallengeError] = useState<string>('');
 
   // ── Estado: Login sin contraseña (OTP) ─────────────────────
   const [otpTarget, setOtpTarget] = useState<string>('');
@@ -73,6 +76,17 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
   const [regErrorMsg, setRegErrorMsg] = useState<string>('');
   const [isSubmittingReg, setIsSubmittingReg] = useState<boolean>(false);
 
+  async function refreshLoginChallenge() {
+    setLoginChallenge(null);
+    setChallengeAnswer('');
+    setChallengeError('');
+    try {
+      setLoginChallenge(await AuthService.getChallenge());
+    } catch (err: any) {
+      setChallengeError(err.message || 'No se pudo cargar la verificación.');
+    }
+  }
+
   // Limpiar campos al abrir
   useEffect(() => {
     if (isOpen) {
@@ -86,6 +100,7 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
       setOtpStep('send');
       setRecoverStep('request');
       setViewMode('login');
+      void refreshLoginChallenge();
     }
   }, [isOpen]);
 
@@ -115,10 +130,19 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
       setErrorMsg('Por favor ingrese su PIN de acceso.');
       return;
     }
+    if (!loginChallenge || !challengeAnswer.trim()) {
+      setErrorMsg(challengeError || 'Resuelva la verificación de seguridad.');
+      return;
+    }
     setIsLoading(true);
     setErrorMsg('');
     try {
-      const res = await loginWithPin(pin, selectedRole, loginUsername.trim() || undefined);
+      const res = await loginWithPin(
+        pin,
+        selectedRole,
+        loginUsername.trim() || undefined,
+        { id: loginChallenge.id, answer: challengeAnswer.trim() }
+      );
       if (res.success) {
         showToast(
           `Sesión iniciada como ${selectedRole === 'dueno' ? 'Dueño / Administrador' : 'Empleado / Cajero'}.`,
@@ -129,9 +153,11 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
       } else {
         setErrorMsg(res.error || 'PIN incorrecto. Intente nuevamente.');
         setPin('');
+        await refreshLoginChallenge();
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error de conexión con el servidor de autenticación.');
+      await refreshLoginChallenge();
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +245,7 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
       return;
     }
     if (recoverNewPassword !== recoverConfirmPass) {
-      setRecoverErrorMsg('La confirmación no coincide con la nueva contraseña.');
+      setRecoverErrorMsg('La confirmación no coincide con el nuevo PIN.');
       return;
     }
     setIsSubmittingRecover(true);
@@ -231,7 +257,7 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
         newPassword: recoverNewPassword.trim(),
       });
       if (res.success) {
-        showToast('Contraseña restablecida con éxito. Ingrese con sus nuevas credenciales.', false, 'success');
+        showToast('PIN restablecido con éxito. Ingrese con sus nuevas credenciales.', false, 'success');
         setViewMode('login');
         setPin('');
       }
@@ -249,8 +275,8 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
       setChangeErrorMsg('Ingrese la contraseña actual para autorizar el cambio.');
       return;
     }
-    if (newPassword.trim().length < 4) {
-      setChangeErrorMsg('La nueva clave debe tener al menos 4 caracteres.');
+    if (!/^\d{4,6}$/.test(newPassword.trim())) {
+      setChangeErrorMsg('El nuevo PIN debe contener entre 4 y 6 dígitos.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -318,7 +344,11 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
         phone: regRecoveryType === 'phone' ? recoveryValue.replace(/\D/g, '') : undefined,
       });
       if (res.success) {
-        showToast(`Negocio ${regBusinessName} registrado con éxito.`, false, 'success');
+        showToast(
+          `Negocio registrado. Cajero: usuario ${res.employeeUsername}, PIN inicial ${res.employeePin}. Guarde y comparta estos datos de forma segura.`,
+          false,
+          'success'
+        );
         onClose();
       } else {
         setRegErrorMsg(res.error || 'Error al registrar la cuenta.');
@@ -497,10 +527,33 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
         />
       </div>
 
+      <div>
+        <label htmlFor="login-challenge-answer" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '6px' }}>
+          Verificación: {loginChallenge?.prompt || 'Cargando...'}
+        </label>
+        <input
+          id="login-challenge-answer"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          value={challengeAnswer}
+          onChange={(e) => setChallengeAnswer(e.target.value.replace(/\D/g, '').slice(0, 2))}
+          placeholder="Respuesta"
+          className="input-field"
+          disabled={!loginChallenge}
+          style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
+        />
+        {challengeError && (
+          <div role="alert" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '5px' }}>
+            {challengeError}
+          </div>
+        )}
+      </div>
+
       {/* Visualizador de PIN */}
       <div>
         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '6px' }}>
-          PIN de seguridad ({selectedRole === 'dueno' ? 'Dueño: 1234' : 'Cajero: 0000'}):
+          PIN de seguridad:
         </label>
         <div
           style={{
@@ -683,14 +736,11 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
                 setOtpTarget(e.target.value);
                 setOtpErrorMsg('');
               }}
-              placeholder="ej. admin@tienda.com o 70001122"
+              placeholder="Correo o teléfono registrado"
               required
               className="input-field"
               style={{ width: '100%', minHeight: '44px', padding: '0 12px', fontSize: '0.88rem' }}
             />
-            <small style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-              Cuentas demo activas: <code>admin@tienda.com</code> (Dueño) y <code>cajero@tienda.com</code> (Cajero).
-            </small>
           </div>
 
           {otpErrorMsg && (
@@ -796,7 +846,7 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
                 setRecoverTarget(e.target.value);
                 setRecoverErrorMsg('');
               }}
-              placeholder="ej. admin@tienda.com o 70001122"
+              placeholder="Correo o teléfono registrado"
               required
               className="input-field"
               style={{ width: '100%', minHeight: '44px', padding: '0 12px' }}
@@ -840,15 +890,16 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
 
           <div>
             <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
-              Nueva contraseña o PIN (mínimo 4 caracteres):
+              Nuevo PIN (4 a 6 dígitos):
             </label>
             <input
               type="password"
+              inputMode="numeric"
+              maxLength={6}
               value={recoverNewPassword}
-              onChange={(e) => setRecoverNewPassword(e.target.value)}
-              placeholder="Nueva clave..."
+              onChange={(e) => setRecoverNewPassword(e.target.value.replace(/\D/g, ''))}
+              placeholder="Nuevo PIN..."
               required
-              minLength={4}
               className="input-field"
               style={{ width: '100%', minHeight: '40px', padding: '0 10px' }}
             />
@@ -856,15 +907,16 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
 
           <div>
             <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
-              Confirmar nueva contraseña:
+              Confirmar nuevo PIN:
             </label>
             <input
               type="password"
+              inputMode="numeric"
+              maxLength={6}
               value={recoverConfirmPass}
-              onChange={(e) => setRecoverConfirmPass(e.target.value)}
-              placeholder="Repita la clave..."
+              onChange={(e) => setRecoverConfirmPass(e.target.value.replace(/\D/g, ''))}
+              placeholder="Repita el PIN..."
               required
-              minLength={4}
               className="input-field"
               style={{ width: '100%', minHeight: '40px', padding: '0 10px' }}
             />
@@ -882,7 +934,7 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
             className="btn btn-primary"
             style={{ minHeight: '44px', width: '100%', fontWeight: 700 }}
           >
-            {isSubmittingRecover ? 'Actualizando...' : 'Restablecer Clave y Acceder'}
+            {isSubmittingRecover ? 'Actualizando...' : 'Restablecer PIN y Acceder'}
           </button>
         </form>
       )}
@@ -969,16 +1021,17 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
 
       <div>
         <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-body)', marginBottom: '4px' }}>
-          Nueva contraseña o PIN (mínimo 4 caracteres):
+          Nuevo PIN (4 a 6 dígitos):
         </label>
         <div style={{ position: 'relative' }}>
           <input
             type={showNewPass ? 'text' : 'password'}
+            inputMode="numeric"
+            maxLength={6}
             value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Nueva clave..."
+            onChange={(e) => setNewPassword(e.target.value.replace(/\D/g, ''))}
+            placeholder="Nuevo PIN..."
             required
-            minLength={4}
             className="input-field"
             style={{ width: '100%', minHeight: '40px', padding: '0 36px 0 10px' }}
           />
@@ -1001,11 +1054,12 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
         </label>
         <input
           type={showNewPass ? 'text' : 'password'}
+          inputMode="numeric"
+          maxLength={6}
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Repita la clave..."
+          onChange={(e) => setConfirmPassword(e.target.value.replace(/\D/g, ''))}
+          placeholder="Repita el PIN..."
           required
-          minLength={4}
           className="input-field"
           style={{ width: '100%', minHeight: '40px', padding: '0 10px' }}
         />
@@ -1023,7 +1077,7 @@ export function LoginModal({ isOpen, onClose, isEmbedded = false }: LoginModalPr
         className="btn btn-primary"
         style={{ minHeight: '44px', width: '100%', fontWeight: 700 }}
       >
-        {isSavingPass ? 'Guardando...' : 'Actualizar Contraseña'}
+        {isSavingPass ? 'Guardando...' : 'Actualizar PIN'}
       </button>
     </form>
   );

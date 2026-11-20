@@ -19,7 +19,14 @@ export const AuthService = {
    * Guarda el token y los datos del usuario en localStorage.
    * @throws ApiError si el PIN es incorrecto o hay error de red.
    */
-  async login(credentials: { pin?: string; role?: Role; username?: string; password?: string }): Promise<AuthSession> {
+  async login(credentials: {
+    pin?: string;
+    role?: Role;
+    username?: string;
+    password?: string;
+    challengeId: string;
+    challengeAnswer: string;
+  }): Promise<AuthSession> {
     try {
       const data = await apiRequest<AuthSession>('/auth/login', {
         method: 'POST',
@@ -37,6 +44,10 @@ export const AuthService = {
     }
   },
 
+  async getChallenge(): Promise<{ id: string; prompt: string }> {
+    return apiRequest<{ id: string; prompt: string }>('/auth/challenge');
+  },
+
   /**
    * Verifica el token actual contra el servidor.
    * Si no hay token intenta restaurar el usuario desde localStorage.
@@ -46,12 +57,7 @@ export const AuthService = {
     try {
       const token = localStorage.getItem('contable_token');
       if (!token) {
-        // Sin token: intentar restaurar solo desde caché local
-        const saved = localStorage.getItem('contable_user');
-        if (saved) {
-          try { return JSON.parse(saved); }
-          catch { return null; }
-        }
+        localStorage.removeItem('contable_user');
         return null;
       }
       // Con token: validar contra el servidor
@@ -62,6 +68,8 @@ export const AuthService = {
       return data.user;
     } catch (error) {
       console.warn('Sesión no válida o expirada:', error);
+      localStorage.removeItem('contable_token');
+      localStorage.removeItem('contable_user');
       return null;
     }
   },
@@ -95,8 +103,8 @@ export const AuthService = {
   },
 
   /**
-   * Cambia la contraseña/PIN de un rol (Dueño o Empleado).
-   * Requiere obligatoriamente el ingreso de la contraseña antigua para autorizar el cambio.
+   * Cambia el PIN de un rol (Dueño o Empleado).
+   * Requiere obligatoriamente el ingreso de la credencial actual para autorizar el cambio.
    */
   async changePassword(data: {
     targetRole: Role;
@@ -124,9 +132,9 @@ export const AuthService = {
     businessName: string;
     email?: string;
     phone?: string;
-  }): Promise<AuthSession> {
+  }): Promise<AuthSession & { employeeUsername: string; employeePin: string }> {
     try {
-      const result = await apiRequest<AuthSession>('/auth/register', {
+      const result = await apiRequest<AuthSession & { employeeUsername: string; employeePin: string }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
       });
