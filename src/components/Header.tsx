@@ -36,7 +36,7 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
       <div className="terminal-brand-area">
         {/* Barra superior con status, sincronización y tema */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-          {/* Botón hamburguesa móvil */}
+          {/* Acceso móvil a los módulos */}
           {onToggleSidebar && (
             <button
               type="button"
@@ -53,13 +53,14 @@ export function Header({ onOpenLogin, onExportCSV, onOpenSearch, onToggleSidebar
                 border: '1px solid rgba(255,255,255,0.2)',
                 color: '#FFFFFF',
               }}
-              aria-label="Abrir menú de navegación móvil"
-              title="Módulos del Sistema"
+              aria-label="Abrir módulos"
+              title="Abrir módulos del sistema"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
+                <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
               </svg>
             </button>
           )}

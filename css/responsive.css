@@ -36,6 +36,10 @@
     #reportMetricsGrid .metric-card:last-child { grid-column: 1 / -1 !important; }
 }
 
+.calendar-weekday-label {
+    display: none;
+}
+
 @media (max-width: 768px) {
     /* Optimización táctil para móviles: botones mínimo 44x48px */
     .btn,
@@ -776,5 +780,165 @@
     .metric-card .value {
         font-size: 17px;
         font-size: clamp(16px, 4.1vw, 17px);
+    }
+
+    .metrics-grid,
+    #reportMetricsGrid,
+    #ccMetricsGrid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #reportMetricsGrid .metric-card,
+    #reportMetricsGrid .metric-card:last-child {
+        grid-column: 1;
+    }
+
+    .main-content-area .grid.grid-cols-2,
+    .main-content-area .op-grid,
+    .main-content-area .cat-grid,
+    .main-content-area .denominations-grid,
+    .main-content-area .dlg-stats {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .variant-editor-row {
+        grid-template-columns: minmax(0, 1fr) 40px !important;
+    }
+
+    .variant-editor-row > div:last-child {
+        grid-column: 2;
+        grid-row: 1 / span 5;
+    }
+
+    .cierre-subnav {
+        flex-direction: column;
+        overflow-x: visible;
+    }
+
+    .cierre-subnav-btn {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .metrics-grid,
+    #reportMetricsGrid,
+    #ccMetricsGrid,
+    .main-content-area [class~="grid-cols-2"],
+    .main-content-area [class~="sm:grid-cols-2"],
+    .main-content-area .op-grid,
+    .main-content-area .cat-grid,
+    .main-content-area .denominations-grid,
+    .main-content-area .dlg-stats {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    #reportMetricsGrid .metric-card,
+    #reportMetricsGrid .metric-card:last-child {
+        grid-column: 1;
+    }
+
+    .main-content-area .flex.justify-between {
+        flex-wrap: wrap;
+    }
+
+    .main-content-area .btn {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .main-content-area input,
+    .main-content-area select,
+    .main-content-area textarea {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .card-box {
+        overflow: visible;
+    }
+
+    .variant-editor-row {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .variant-editor-row > div:last-child {
+        grid-column: auto;
+        grid-row: auto;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .table-container,
+    .table-responsive-container,
+    .table-responsive {
+        max-height: none;
+    }
+
+    .mobile-drawer-open .sidebar-title,
+    .mobile-drawer-open .sidebar-subtitle {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere;
+    }
+
+    .calendar-weekdays {
+        display: none !important;
+    }
+
+    .main-content-area .calendar-month-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 8px;
+    }
+
+    .calendar-day-empty {
+        display: none;
+    }
+
+    .calendar-day-cell {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: start;
+        gap: 0 12px;
+        min-height: 0 !important;
+        padding: 12px !important;
+    }
+
+    .calendar-day-heading {
+        grid-column: 1;
+        grid-row: 1;
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .calendar-weekday-label {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+
+    .calendar-day-info {
+        grid-column: 1;
+        grid-row: 2;
+        min-width: 0;
+        margin-top: 0 !important;
+    }
+
+    .calendar-status-label {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .calendar-note {
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 }

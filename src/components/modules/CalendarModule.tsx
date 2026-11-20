@@ -52,6 +52,7 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
+  const weekdayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
   // Month navigation
   const handlePrevMonth = () => {
@@ -220,7 +221,7 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
         </div>
 
         {/* Rejilla de Días de la Semana */}
-        <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-[#2F4A38] mb-1">
+        <div className="calendar-weekdays grid grid-cols-7 gap-1 text-center font-bold text-xs text-[#2F4A38] mb-1">
           {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((w) => (
             <div key={w} className="p-1 bg-[#EDF3E8] rounded text-[#2F4A38]">
               {w}
@@ -229,13 +230,13 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
         </div>
 
         {/* Rejilla del Calendario */}
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="calendar-month-grid grid grid-cols-7 gap-1.5">
           {calendarDays.map((d, idx) => {
             if (!d.dayNumber) {
               return (
                 <div
                   key={`empty-${idx}`}
-                  className="p-2 min-h-[75px] rounded-lg bg-[#EEF1E8]/40 border border-transparent"
+                  className="calendar-day-empty p-2 min-h-[75px] rounded-lg bg-[#EEF1E8]/40 border border-transparent"
                 ></div>
               );
             }
@@ -267,12 +268,12 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
               <div
                 key={d.dateStr}
                 onClick={() => handleOpenDay(d.dateStr)}
-                className={`p-2 min-h-[75px] rounded-lg border transition-all cursor-pointer flex flex-col justify-between hover:shadow-sm ${bgClass} ${
+                className={`calendar-day-cell p-2 min-h-[75px] rounded-lg border transition-all cursor-pointer flex flex-col justify-between hover:shadow-sm ${bgClass} ${
                   isToday ? 'ring-2 ring-[#4F6F52]' : ''
                 }`}
                 title={`Click para editar jornada del ${d.dateStr}`}
               >
-                <div className="flex justify-between items-start">
+                <div className="calendar-day-heading flex justify-between items-start">
                   <span
                     className={`text-xs font-bold ${
                       isToday ? 'text-[#2F4A38] underline' : 'text-[#2F3A33]'
@@ -280,6 +281,7 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
                   >
                     {d.dayNumber}
                   </span>
+                  <span className="calendar-weekday-label">{weekdayNames[new Date(year, month, d.dayNumber).getDay()]}</span>
                   {isToday && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#4F6F52] text-white font-bold">
                       HOY
@@ -287,12 +289,12 @@ export function CalendarModule({ onRefreshData }: CalendarModuleProps) {
                   )}
                 </div>
 
-                <div className="mt-1">
-                  <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeClass}`}>
+                <div className="calendar-day-info mt-1">
+                  <span className={`calendar-status-label inline-block text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeClass}`}>
                     {label}
                   </span>
                   {info?.note && (
-                    <span className="block text-[10px] text-[#6F7B72] truncate mt-0.5" title={info.note}>
+                    <span className="calendar-note block text-[10px] text-[#6F7B72] mt-0.5" title={info.note}>
                       {info.note}
                     </span>
                   )}
